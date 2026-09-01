@@ -24,8 +24,12 @@ function nuevoId(prefijo: string): string {
 }
 
 function estadoInicial(): EstadoVpc {
-  const pub = { id: nuevoId('subred'), nombre: 'Subred pública A', az: AZS_DISPONIBLES[0], ruta: 'igw' as const }
-  const priv = { id: nuevoId('subred'), nombre: 'Subred privada A', az: AZS_DISPONIBLES[0], ruta: 'nat' as const }
+  // Fixed ids (not nuevoId()) on purpose: this initializer runs through useState's
+  // lazy-init, which React Strict Mode/SSR hydration can invoke more than once —
+  // a shared mutable counter here desyncs the ids the server rendered from the
+  // ids the client ends up holding, silently breaking every id-based lookup.
+  const pub = { id: 'subred-publica-inicial', nombre: 'Subred pública A', az: AZS_DISPONIBLES[0], ruta: 'igw' as const }
+  const priv = { id: 'subred-privada-inicial', nombre: 'Subred privada A', az: AZS_DISPONIBLES[0], ruta: 'nat' as const }
   return {
     igwAdjunto: true,
     subredes: [pub, priv],
