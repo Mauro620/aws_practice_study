@@ -1,10 +1,11 @@
 import { MDXRemote } from 'next-mdx-remote/rsc'
 import { MDX_OPTIONS } from '@/lib/mdx-options'
 import type { Servicio } from '@/lib/types'
+import { CidrCalculator } from './CidrCalculator'
 import { NivelSelector } from './NivelSelector'
 import { VpcReferenceDiagram } from './VpcReferenceDiagram'
 
-const MDX_COMPONENTS = { VpcReferenceDiagram }
+const MDX_COMPONENTS = { VpcReferenceDiagram, CidrCalculator }
 
 export async function ServicioView({ servicio }: { servicio: Servicio }) {
   const niveles = await Promise.all(
