@@ -4,7 +4,10 @@ import type { ServicioMeta } from '@/lib/types'
 // Standalone interactive tools (CIDR calculator, VPC builder, ...) live outside
 // the per-Servicio content tree, so they're listed here rather than derived
 // from content/servicios like NavList below.
-const TOOLS: { href: string; label: string }[] = [{ href: '/herramientas/cidr', label: 'Calculadora de CIDR' }]
+const TOOLS: { href: string; label: string }[] = [
+  { href: '/herramientas/cidr', label: 'Calculadora de CIDR' },
+  { href: '/herramientas/constructor-vpc', label: 'Constructor visual de VPC' },
+]
 
 function NavList({ servicios }: { servicios: ServicioMeta[] }) {
   return (

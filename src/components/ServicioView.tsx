@@ -3,9 +3,10 @@ import { MDX_OPTIONS } from '@/lib/mdx-options'
 import type { Servicio } from '@/lib/types'
 import { CidrCalculator } from './CidrCalculator'
 import { NivelSelector } from './NivelSelector'
+import { VpcBuilder } from './VpcBuilder'
 import { VpcReferenceDiagram } from './VpcReferenceDiagram'
 
-const MDX_COMPONENTS = { VpcReferenceDiagram, CidrCalculator }
+const MDX_COMPONENTS = { VpcReferenceDiagram, CidrCalculator, VpcBuilder }
 
 export async function ServicioView({ servicio }: { servicio: Servicio }) {
   const niveles = await Promise.all(
