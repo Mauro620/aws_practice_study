@@ -1,0 +1,30 @@
+---
+titulo: Caso mínimo
+---
+
+El ejemplo más chico que efectivamente funciona: una VPC, una subred pública, una instancia con salida a Internet.
+
+1. Creás la VPC con bloque `10.0.0.0/16` — 65.536 direcciones IP privadas disponibles.
+2. Dentro de esa VPC creás una subred `10.0.1.0/24` en la AZ `us-east-1a` — 256 direcciones, de las cuales AWS reserva 5 y quedan 251 utilizables.
+3. Creás un **Internet Gateway** y lo adjuntás a la VPC (solo puede haber uno por VPC).
+4. En la tabla de rutas de la subred agregás la ruta `0.0.0.0/0 → igw-0a1b2c3d`. Sin esa ruta explícita, la subred no es pública aunque "se vea" como tal.
+5. Lanzás una instancia EC2 en esa subred, con una IP pública asignada.
+6. Le asociás un Security Group que permite entrada por el puerto 443 (o 22 para acceso administrativo) desde tu propia IP.
+
+Con esos seis pasos ya tenés una instancia accesible desde Internet. Nada de esto funciona si falta una sola pieza: podés tener el Internet Gateway creado y adjunto, pero si la ruta `0.0.0.0/0` no apunta a él, o si la instancia no tiene IP pública, o si el Security Group no deja pasar el tráfico, seguís sin acceso. Las cuatro condiciones son necesarias en conjunto, no alternativas:
+
+| # | Condición |
+| --- | --- |
+| 1 | Internet Gateway creado y adjunto a la VPC |
+| 2 | Ruta `0.0.0.0/0 → igw-xxxx` en la tabla de rutas de la subred |
+| 3 | La instancia tiene IP pública o Elastic IP |
+| 4 | El Security Group y la NACL permiten el tráfico |
+
+Tamaños de red más comunes, para referencia al elegir el CIDR de la VPC o de una subred:
+
+| CIDR | Máscara | Direcciones totales | Utilizables en una subred de AWS |
+| --- | --- | --- | --- |
+| /16 | 255.255.0.0 | 65.536 | — (tamaño típico de VPC, no de subred) |
+| /24 | 255.255.255.0 | 256 | 251 |
+| /26 | 255.255.255.192 | 64 | 59 |
+| /28 | 255.255.255.240 | 16 | 11 (mínimo permitido por AWS) |

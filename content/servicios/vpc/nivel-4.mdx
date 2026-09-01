@@ -1,0 +1,35 @@
+---
+titulo: Bordes y trampas
+---
+
+**El CIDR principal de la VPC no se puede cambiar después de creada.** Podés agregar hasta 4 bloques CIDR secundarios, pero el principal queda fijo para siempre. El prefijo debe estar entre `/16` (65.536 IPs, el máximo permitido) y `/28` (16 IPs, el mínimo). Si más adelante pensás conectar esta VPC con otra por peering, Transit Gateway o VPN, los bloques CIDR de ambas **no pueden solaparse** — hay que planificar el direccionamiento antes de crear nada, porque corregirlo después implica recrear la VPC.
+
+**AWS reserva 5 direcciones por subred, no 2 como en una red tradicional.** En una subred `10.0.1.0/24`:
+
+| Dirección | Uso |
+| --- | --- |
+| 10.0.1.0 | Dirección de red |
+| 10.0.1.1 | Router de la VPC |
+| 10.0.1.2 | Servidor DNS de AWS |
+| 10.0.1.3 | Reservada para uso futuro |
+| 10.0.1.255 | Broadcast (reservada; AWS no soporta broadcast) |
+
+Por eso una subred `/24` deja 251 IPs utilizables, no 254 — y una subred `/28` (la mínima permitida) deja apenas 11.
+
+**El NAT Gateway tiene costo por hora más costo por GB procesado**, y suele ser uno de los rubros más caros de una VPC mal diseñada. Un solo NAT Gateway para toda la VPC es además un punto único de fallo y genera cargos por transferencia entre AZ — la práctica recomendada es un NAT Gateway por AZ, lo que multiplica el costo fijo por la cantidad de AZ.
+
+**Security Group y Network ACL no son intercambiables**, y la diferencia clave para el examen es *stateful* vs *stateless*:
+
+| | Security Group | Network ACL |
+| --- | --- | --- |
+| Nivel de aplicación | Instancia (ENI) | Subred |
+| Estado | Stateful | Stateless |
+| Tipos de regla | Solo *allow* | *Allow* y *deny* |
+| Evaluación | Todas las reglas en conjunto | Por orden numérico, gana la primera coincidencia |
+| Comportamiento por defecto | Deniega toda entrada, permite toda salida | La NACL default permite todo el tráfico |
+
+La consecuencia práctica: si en un Security Group permitís la entrada al puerto 443, la respuesta sale automáticamente, sin regla adicional. En una NACL tendrías que permitir explícitamente también la salida por los puertos efímeros (1024–65535) — olvidarse de eso es un error común y silencioso.
+
+**El VPC Peering no es transitivo.** Si la VPC A tiene peering con B, y B tiene peering con C, A no puede alcanzar a C — hace falta un peering directo entre A y C, o migrar a Transit Gateway si el número de VPCs conectadas crece.
+
+**Una VPC nueva ya trae una VPC por defecto en cada región**, con subredes públicas preconfiguradas. Sirve para probar rápido, pero no se recomienda para producción: no tiene el diseño de subredes públicas/privadas que exige una arquitectura segura.

@@ -1,0 +1,36 @@
+{
+  "id": "vpc",
+  "nombre": "Amazon VPC (Virtual Private Cloud)",
+  "categoria": "Red",
+  "modulo": 1,
+  "prerequisitos": [],
+  "resumenUnaLinea": "Tu propia red privada y aislada dentro de AWS: todo lo demás (EC2, RDS, Lambda...) vive dentro de una VPC.",
+  "erroresFrecuentes": [
+    { "descripcion": "Elegir un CIDR muy pequeño o que se solapa con la red corporativa — no tiene arreglo fácil una vez creada la VPC." },
+    { "descripcion": "Olvidar que AWS reserva 5 IPs por subred, no 2 como en una red tradicional." },
+    { "descripcion": "Creer que \"pública/privada\" es un atributo de la subred y no una consecuencia de su tabla de rutas." },
+    { "descripcion": "Colocar el NAT Gateway en la subred privada — debe ir en una subred pública." },
+    { "descripcion": "Usar un solo NAT Gateway para toda la VPC: es un punto único de fallo y genera cargos por transferencia entre AZ." },
+    { "descripcion": "Esperar que el VPC Peering sea transitivo: si A↔B y B↔C, A no ve a C." },
+    { "descripcion": "Abrir el puerto 22 o 3389 a 0.0.0.0/0 en un Security Group." },
+    { "descripcion": "Dejar la Network ACL por defecto creyendo que ya filtra algo: la NACL por defecto permite todo el tráfico." }
+  ],
+  "glosario": [
+    { "termino": "CIDR", "definicion": "Notación IP/prefijo que define el tamaño de una red." },
+    { "termino": "VPC", "definicion": "Red virtual aislada dentro de una región de AWS." },
+    { "termino": "Subred", "definicion": "Segmento de la VPC confinado a una sola AZ." },
+    { "termino": "AZ (Availability Zone)", "definicion": "Conjunto de centros de datos físicamente aislados dentro de una región." },
+    { "termino": "Internet Gateway", "definicion": "Router virtual que da acceso bidireccional a Internet." },
+    { "termino": "NAT Gateway", "definicion": "Servicio que permite salida a Internet a subredes privadas, sin exponerlas a conexiones entrantes." },
+    { "termino": "Route Table", "definicion": "Conjunto de reglas que determinan hacia dónde va el tráfico según su destino." },
+    { "termino": "Ruta local", "definicion": "Ruta inmutable, presente en toda tabla de rutas, que permite la comunicación interna de la VPC." },
+    { "termino": "Security Group", "definicion": "Firewall stateful a nivel de instancia (ENI)." },
+    { "termino": "Network ACL", "definicion": "Firewall stateless a nivel de subred." },
+    { "termino": "ENI", "definicion": "Elastic Network Interface: interfaz de red virtual de una instancia." },
+    { "termino": "Elastic IP", "definicion": "Dirección IP pública estática, asociable a instancias o NAT Gateways." },
+    { "termino": "VPC Endpoint", "definicion": "Acceso privado a servicios de AWS sin salir a Internet." },
+    { "termino": "VPC Peering", "definicion": "Conexión directa y no transitiva entre dos VPCs." },
+    { "termino": "Flow Logs", "definicion": "Registro del tráfico IP que entra y sale de la VPC." }
+  ],
+  "preguntas": []
+}

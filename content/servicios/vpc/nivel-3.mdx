@@ -1,0 +1,37 @@
+---
+titulo: Caso realista
+---
+
+En producción, una sola AZ no alcanza: si esa AZ tiene un problema, la aplicación entera cae. El diseño mínimo recomendado despliega en **al menos 2 AZ**, con el patrón de 2 subredes por AZ (pública y privada) — 4 subredes en total.
+
+<VpcReferenceDiagram />
+
+En cada AZ, la subred pública aloja el balanceador de carga y el NAT Gateway; la subred privada aloja los servidores de aplicación y la base de datos. La réplica de base de datos en la segunda AZ queda en espera (*standby*), lista para asumir la carga si la primaria falla.
+
+| Subred | AZ | Tipo | Uso típico |
+| --- | --- | --- | --- |
+| 10.0.0.0/20 | us-east-1a | Pública | Load balancer, NAT Gateway |
+| 10.0.16.0/20 | us-east-1a | Privada | Servidores de aplicación, base de datos primaria |
+| 10.0.128.0/20 | us-east-1b | Pública | Load balancer (redundancia) |
+| 10.0.144.0/20 | us-east-1b | Privada | Servidores de aplicación, base de datos en espera |
+
+La diferencia entre pública y privada nunca es un interruptor: depende exclusivamente de a dónde apunta la ruta `0.0.0.0/0` de esa subred.
+
+| | Subred pública | Subred privada |
+| --- | --- | --- |
+| Ruta `0.0.0.0/0` apunta a | Internet Gateway | NAT Gateway (o no existe) |
+| Accesible desde Internet | Sí, si el Security Group lo permite | No |
+| Puede salir hacia Internet | Sí | Solo a través del NAT Gateway |
+| Qué se coloca ahí | Load balancer, NAT Gateway, bastion host | Servidores de aplicación, base de datos |
+
+Internet Gateway y NAT Gateway se confunden seguido porque los dos "dan salida a Internet", pero cumplen roles opuestos:
+
+| | Internet Gateway | NAT Gateway |
+| --- | --- | --- |
+| Ubicación | Adjunto a la VPC | Dentro de una subred pública |
+| Usado por | Subredes públicas | Subredes privadas |
+| Dirección del tráfico | Bidireccional | Solo salida |
+| Alcance | Regional, redundante | Zonal — se necesita uno por AZ para alta disponibilidad |
+| Costo | Sin costo propio | Tarifa por hora + por GB procesado |
+
+Todas las subredes de esta VPC — públicas y privadas, en la misma AZ o en distintas — se comunican entre sí automáticamente, porque toda tabla de rutas incluye una ruta local obligatoria hacia el bloque completo de la VPC. Esa comunicación interna no depende del Internet Gateway ni del NAT Gateway: solo depende de que el Security Group y la NACL la permitan.

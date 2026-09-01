@@ -1,0 +1,27 @@
+---
+titulo: Analogía
+---
+
+Imaginá que AWS es un enorme parque industrial. Vos no sos dueño del terreno, del tendido eléctrico ni de las calles internas: eso lo administra AWS. Lo que sí tenés es tu propio **edificio de oficinas** dentro de ese parque, cercado y aislado del resto — nadie de otra empresa puede entrar sin que vos lo permitas. Ese edificio es tu **VPC**.
+
+Dentro de tu edificio hay **pisos**: cada piso es una **subred**, y cada piso está construido físicamente en un **bloque distinto** del parque industrial — eso es la **Zona de Disponibilidad (AZ)**. Si un bloque se queda sin luz, los otros bloques siguen funcionando, porque cada uno tiene su propia acometida eléctrica y su propia sala de máquinas.
+
+Algunos pisos tienen una puerta que da directo a la calle: son las **subredes públicas**. Otros pisos no tienen puerta a la calle — solo se llega a ellos por el ascensor interno del edificio: son las **subredes privadas**, y ahí es donde guardás lo valioso (las bases de datos, los servidores internos).
+
+- La **puerta principal del edificio** — la única, y por la que puede entrar y salir cualquiera con acceso — es el **Internet Gateway**.
+- El personal de los pisos privados que necesita salir a hacer un trámite (bajar una actualización, llamar a una API externa) pero no puede recibir visitas, usa la **puerta de servicio con portero**: ese es el **NAT Gateway**. Deja salir, pero nadie de afuera puede entrar por ahí.
+- Cada oficina tiene su propia **cerradura con tarjeta magnética** que recuerda quién entró para dejarlo salir sin volver a pedir la tarjeta: eso es el **Security Group** — es *stateful*, recuerda la conversación.
+- El edificio además tiene un **guardia en la recepción de cada piso** que revisa a todo el que entra y a todo el que sale, sin memoria de visitas anteriores: cada movimiento se revisa de cero. Ese guardia es la **Network ACL** — es *stateless*.
+
+Con esta imagen alcanza para entender el resto: una VPC es un edificio propio, aislado, dentro de un parque que administra otro.
+
+| Edificio (mundo físico) | Amazon VPC |
+| --- | --- |
+| El parque industrial completo | La región de AWS |
+| Tu edificio, cercado | La VPC |
+| Un piso del edificio | Una subred |
+| El bloque donde está el edificio | La Zona de Disponibilidad (AZ) |
+| Puerta principal a la calle | Internet Gateway |
+| Puerta de servicio con portero | NAT Gateway |
+| Cerradura con tarjeta que recuerda | Security Group (stateful) |
+| Guardia que revisa todo sin memoria | Network ACL (stateless) |
