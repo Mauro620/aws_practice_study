@@ -6,6 +6,7 @@ import type { ServicioMeta } from '@/lib/types'
 // from content/servicios like NavList below.
 const TOOLS: { href: string; label: string }[] = [
   { href: '/herramientas/cidr', label: 'Calculadora de CIDR' },
+  { href: '/herramientas/rutas', label: 'Simulador de tablas de rutas' },
   { href: '/herramientas/constructor-vpc', label: 'Constructor visual de VPC' },
 ]
 
