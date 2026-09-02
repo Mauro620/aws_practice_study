@@ -21,16 +21,18 @@ export type TipoInstanciaParseado = {
   raw: string
 }
 
-const FAMILIAS_VALIDAS = ['T', 'M', 'C', 'R', 'X', 'I', 'D', 'H', 'P', 'G', 'Inf', 'Trn']
+// Uppercase throughout: parsearTipoInstancia always uppercases the matched
+// family, so comparisons here must be against the same case (INF, not Inf).
+const FAMILIAS_VALIDAS = ['T', 'M', 'C', 'R', 'X', 'I', 'D', 'H', 'P', 'G', 'INF', 'TRN']
 const PROCESADORES_VALIDOS = ['a', 'g', 'i']
 const ATRIBUTOS_VALIDOS = ['d', 'n', 'e', 'z', 'b', 'flex']
-// 'nano' / 'metal' no están en el spec de saltos pero aparecen como casos borde reales.
-// Documentamos los tamaños oficiales del material; nano no es un tamaño EC2 real
-// (es solo free-tier y marketing), metal sí.
+// Exactly the progression from section 2.1: "nano → micro → ... → 32xlarge →
+// metal". Nothing added beyond it (e.g. 48xlarge exists on real AWS families
+// but isn't in this course material, so it's not treated as valid here).
 const TAMANOS_VALIDOS = [
-  'micro', 'small', 'medium', 'large',
+  'nano', 'micro', 'small', 'medium', 'large',
   'xlarge', '2xlarge', '4xlarge', '8xlarge', '12xlarge', '16xlarge',
-  '24xlarge', '32xlarge', '48xlarge', 'metal',
+  '24xlarge', '32xlarge', 'metal',
 ]
 
 const SIZE_PATTERN = `(${TAMANOS_VALIDOS.join('|')})`
@@ -42,8 +44,10 @@ export function parsearTipoInstancia(input: string): TipoInstanciaParseado | nul
   if (!raw) return null
 
   // Pattern: family + generation + (processor)? + (atributos) + . + size
+  // Family is one-or-more letters (lazy) so multi-letter prefixes like "inf"
+  // or "trn" resolve correctly instead of being cut to their first letter.
   // Attributes are lowercase letters validated against ATRIBUTOS_VALIDOS.
-  const pattern = new RegExp(`^([a-z])(\\d+)([agi]?)([a-z]*)\\.${SIZE_PATTERN}$`)
+  const pattern = new RegExp(`^([a-z]+?)(\\d+)([agi]?)([a-z]*)\\.${SIZE_PATTERN}$`)
   const m = pattern.exec(raw)
   if (!m) return null
 
@@ -135,19 +139,52 @@ export const familiasInstancia: FamiliaInstancia[] = [
     reglaMnemotecnica: 'I/O',
   },
   {
+    // Source groups D and H in one row ("D / H") with no per-family example
+    // codes — split here for lookup purposes, same sourced text for both,
+    // ejemplos left blank rather than inventing instance codes.
     familia: 'D',
     categoria: 'Almacenamiento denso',
     perfil: 'HDD de gran capacidad',
     casosDeUso: 'Hadoop, data lakes',
-    ejemplos: 'd2, d3',
+    ejemplos: '',
     reglaMnemotecnica: 'Dense',
   },
   {
+    familia: 'H',
+    categoria: 'Almacenamiento denso',
+    perfil: 'HDD de gran capacidad',
+    casosDeUso: 'Hadoop, data lakes',
+    ejemplos: '',
+  },
+  {
+    // Source groups P / G / Inf / Trn in one row, same reasoning as D/H.
+    // The mnemonic assigns "GPU" to the letter G specifically, not P.
     familia: 'P',
-    categoria: 'Aceleradas (GPU)',
+    categoria: 'Aceleradas (GPU o chips de IA)',
     perfil: 'GPU o chips de IA',
     casosDeUso: 'Machine learning, entrenamiento, inferencia, renderizado',
-    ejemplos: 'p4, p5',
-    reglaMnemotecnica: 'GPU (junto con G/Inf/Trn)',
+    ejemplos: '',
+  },
+  {
+    familia: 'G',
+    categoria: 'Aceleradas (GPU o chips de IA)',
+    perfil: 'GPU o chips de IA',
+    casosDeUso: 'Machine learning, entrenamiento, inferencia, renderizado',
+    ejemplos: '',
+    reglaMnemotecnica: 'GPU',
+  },
+  {
+    familia: 'INF',
+    categoria: 'Aceleradas (GPU o chips de IA)',
+    perfil: 'GPU o chips de IA',
+    casosDeUso: 'Machine learning, entrenamiento, inferencia, renderizado',
+    ejemplos: '',
+  },
+  {
+    familia: 'TRN',
+    categoria: 'Aceleradas (GPU o chips de IA)',
+    perfil: 'GPU o chips de IA',
+    casosDeUso: 'Machine learning, entrenamiento, inferencia, renderizado',
+    ejemplos: '',
   },
 ]

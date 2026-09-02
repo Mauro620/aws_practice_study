@@ -65,6 +65,27 @@ describe('parsearTipoInstancia', () => {
     expect(r!.tamano).toBe('metal')
   })
 
+  it('decodifica t3.nano (tamaño más chico de la progresión, section 2.1)', () => {
+    const r = parsearTipoInstancia('t3.nano')
+    expect(r).not.toBeNull()
+    expect(r!.tamano).toBe('nano')
+  })
+
+  it('decodifica familias multi-letra (inf, trn) sin truncarlas a un solo carácter', () => {
+    const inf = parsearTipoInstancia('inf1.xlarge')
+    expect(inf).not.toBeNull()
+    expect(inf!.familia).toBe('INF')
+    expect(inf!.generacion).toBe(1)
+
+    const trn = parsearTipoInstancia('trn1.2xlarge')
+    expect(trn).not.toBeNull()
+    expect(trn!.familia).toBe('TRN')
+  })
+
+  it('rechaza 48xlarge: no está en la progresión de tamaños del material', () => {
+    expect(parsearTipoInstancia('m6i.48xlarge')).toBeNull()
+  })
+
   it('devuelve null cuando el formato no encaja', () => {
     expect(parsearTipoInstancia('m7gd')).toBeNull() // sin tamaño
     expect(parsearTipoInstancia('m7gd.')).toBeNull()
@@ -91,9 +112,16 @@ describe('parsearTipoInstancia', () => {
 })
 
 describe('familiasInstancia', () => {
-  it('incluye las 8 familias del curso con su categoría y perfil', () => {
+  it('incluye las 12 familias del curso (T/M/C/R/X/I/D/H/P/G/INF/TRN), con su categoría y perfil', () => {
     const ids = familiasInstancia.map((f) => f.familia)
-    expect(ids).toEqual(['T', 'M', 'C', 'R', 'X', 'I', 'D', 'P'])
+    expect(ids).toEqual(['T', 'M', 'C', 'R', 'X', 'I', 'D', 'H', 'P', 'G', 'INF', 'TRN'])
+  })
+
+  it('el mnemotécnico GPU va con la letra G, no con P (así lo dice section 2.2)', () => {
+    const g = familiasInstancia.find((f) => f.familia === 'G')
+    const p = familiasInstancia.find((f) => f.familia === 'P')
+    expect(g?.reglaMnemotecnica).toBe('GPU')
+    expect(p?.reglaMnemotecnica).toBeUndefined()
   })
 
   it('cada familia tiene ejemplos y casos de uso como strings no vacíos', () => {

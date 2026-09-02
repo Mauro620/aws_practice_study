@@ -141,9 +141,11 @@ export function Ec2InstanceExplorer() {
               <p className="mt-1 text-sm text-foreground/80">
                 <span className="font-medium">Casos de uso:</span> {familiaMatch.casosDeUso}
               </p>
-              <p className="mt-1 text-sm text-foreground/60">
-                <span className="font-medium">Ejemplos:</span> <span className="font-mono">{familiaMatch.ejemplos}</span>
-              </p>
+              {familiaMatch.ejemplos && (
+                <p className="mt-1 text-sm text-foreground/60">
+                  <span className="font-medium">Ejemplos:</span> <span className="font-mono">{familiaMatch.ejemplos}</span>
+                </p>
+              )}
             </section>
           )}
         </>
@@ -178,7 +180,7 @@ export function Ec2InstanceExplorer() {
                   <td className="py-2 pr-3 text-foreground/80">{f.categoria}</td>
                   <td className="py-2 pr-3 text-foreground/70">{f.perfil}</td>
                   <td className="py-2 pr-3 text-foreground/70">{f.casosDeUso}</td>
-                  <td className="py-2 font-mono text-foreground/70">{f.ejemplos}</td>
+                  <td className="py-2 font-mono text-foreground/70">{f.ejemplos || '—'}</td>
                 </tr>
               ))}
             </tbody>
