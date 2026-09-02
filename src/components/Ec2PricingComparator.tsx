@@ -186,7 +186,7 @@ export function Ec2PricingComparator() {
           </label>
         </div>
 
-        <TarjetasModelos resultados={resultadosCompromiso} esRecargo={false} precioPorHora={precio} />
+        <TarjetasModelos resultados={resultadosCompromiso} esRecargo={false} precioPorHora={precio} horas={horas} />
       </section>
 
       <section>
@@ -211,7 +211,7 @@ export function Ec2PricingComparator() {
           </label>
         </div>
 
-        <TarjetasModelos resultados={resultadosDedicated} esRecargo={true} precioPorHora={precio} />
+        <TarjetasModelos resultados={resultadosDedicated} esRecargo={true} precioPorHora={precio} horas={horas} />
       </section>
 
       {masBarato && (
@@ -279,10 +279,12 @@ function TarjetasModelos({
   resultados,
   esRecargo,
   precioPorHora,
+  horas,
 }: {
   resultados: ReturnType<typeof compararModelos>
   esRecargo: boolean
   precioPorHora: number | null
+  horas: number
 }) {
   const modelos = Object.keys(resultados) as ModeloCompra[]
   return (
@@ -318,8 +320,8 @@ function TarjetasModelos({
             )}
             {precioPorHora && r.aplicable && r.costoMensualUSD !== null && (
               <p className="mt-1 text-xs text-foreground/60">
-                Base On-Demand sin descuento: ${(precioPorHora * Math.min(r.costoMensualUSD > 0 ? 730 : 0)).toFixed(2)}{' '}
-                aproximada para un mes de 730 h.
+                Base On-Demand sin descuento: ${(precioPorHora * Math.min(horas, 730)).toFixed(2)}{' '}
+                aproximada para {Math.min(horas, 730)} h/mes.
               </p>
             )}
           </article>
