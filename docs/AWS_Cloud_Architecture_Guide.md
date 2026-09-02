@@ -50,22 +50,3 @@ Al conectarte desde la terminal de tu PC (`ssh -i credenciales.pem ec2-user@<IP_
 
 ---
 
-## 4. Prompt para generar la UI en tu aplicación Next.js
-
-Para integrar toda esta información a tu app centralizada, puedes usar el siguiente prompt detallado en tu asistente de código (Cursor, Claude, Copilot, etc.):
-
-**[COPIAR DESDE AQUÍ]**
-> Actúa como un desarrollador experto en React, Next.js (App Router) y Tailwind CSS. Estoy construyendo una plataforma educativa interactiva donde centralizo el material de mi curso de AWS Cloud Architecture.
-> 
-> Quiero que construyas un componente de página llamado `AWSArchitectureGuide.tsx`. Este componente debe renderizar el contenido de una guía de arquitectura (VPC, EC2, Balanceadores) que te proporcionaré, pero no como simple texto, sino con un diseño UI/UX premium, limpio y muy interactivo.
-> 
-> **Requerimientos técnicos y de diseño:**
-> 1.  **Layout y Navegación:** Implementa un layout que incluya un 'Table of Contents' (ToC) dinámico y fijado en el lado izquierdo o derecho (sticky sidebar), que resalte en qué sección de la guía se encuentra el usuario al hacer scroll.
-> 2.  **Modo Oscuro/Tematización:** Usa una paleta de colores moderna orientada a herramientas de desarrollo (fondos oscuros tipo Vercel/AWS dark mode). Usa acentos de color naranja (tipo AWS `#FF9900`) para resaltar títulos, iconos o botones importantes.
-> 3.  **Bloques de Código (Terminal):** Todos los comandos bash (`sudo su`, `dnf update -y`, etc.) deben estar dentro de componentes personalizados de 'CodeSnippet'. Estos componentes deben tener un diseño tipo terminal de Mac/Linux, mostrar el lenguaje, y tener un botón funcional de 'Copiar al portapapeles' con feedback visual (ej. cambiar a un ícono de check verde al hacer clic).
-> 4.  **Profundización de Conceptos (Callouts/Accordions):** Las secciones marcadas como "Profundización" (Security Groups, Target Groups, Balanceadores de Carga) deben renderizarse usando un diseño especial. Usa tarjetas con bordes resaltados (Callouts) o componentes tipo 'Accordion' (colapsables) para organizar la información y que visualmente destaquen como conceptos clave de arquitectura.
-> 5.  **Estructura del contenido:** Pasa el texto del markdown que te daré a continuación a una estructura de datos estructurada (JSON o constantes de React) para que el renderizado de la UI sea limpio y escalable mediante mapeo de componentes.
-> 
-> Aquí está el contenido base de la guía que debes utilizar para poblar la UI:
-> [PEGAR AQUÍ EL CONTENIDO DE LA GUÍA]
-**[FIN DEL PROMPT]**
