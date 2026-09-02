@@ -72,7 +72,7 @@ export function CidrCalculator({ cidrPorDefecto = '10.0.0.0/16' }: { cidrPorDefe
 
   return (
     <div className="not-prose space-y-8">
-      <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
+      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
         <label className="block">
           <span className="mb-1 block text-sm font-medium">Bloque CIDR</span>
           <input
@@ -90,7 +90,7 @@ export function CidrCalculator({ cidrPorDefecto = '10.0.0.0/16' }: { cidrPorDefe
             min={1}
             value={subnetCountInput}
             onChange={(e) => setSubnetCountInput(e.target.value)}
-            className="w-32 rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-accent sm:w-32"
           />
         </label>
       </div>
@@ -150,7 +150,7 @@ export function CidrCalculator({ cidrPorDefecto = '10.0.0.0/16' }: { cidrPorDefe
 
           <div>
             <h4 className="font-semibold">Las 5 direcciones que reserva AWS</h4>
-            <table className="mt-2 w-full text-left text-sm">
+            <table className="mt-2 min-w-[30rem] w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-foreground/50">
                   <th className="py-1 pr-4 font-medium">Dirección</th>
@@ -180,7 +180,7 @@ export function CidrCalculator({ cidrPorDefecto = '10.0.0.0/16' }: { cidrPorDefe
                 {subnetPlan.subnets.length} subredes /{subnetPlan.targetPrefix}
               </h4>
               <div className="mt-2 overflow-x-auto">
-                <table className="w-full text-left text-sm">
+                <table className="min-w-[42rem] w-full text-left text-sm">
                   <thead>
                     <tr className="border-b border-border text-foreground/50">
                       <th className="py-1 pr-4 font-medium">CIDR</th>

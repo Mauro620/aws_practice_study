@@ -24,7 +24,7 @@ export function NivelSelector({ niveles }: { niveles: NivelConContenido[] }) {
             aria-selected={nivel.numero === activo}
             onClick={() => setActivo(nivel.numero)}
             className={
-              'rounded-full px-4 py-1.5 text-sm font-medium transition-colors ' +
+              'min-h-11 rounded-full px-4 py-2 text-sm font-medium transition-colors ' +
               (nivel.numero === activo
                 ? 'bg-slate-900 text-white'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200')

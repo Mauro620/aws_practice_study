@@ -80,7 +80,7 @@ export function ExamEngine() {
     return (
       <section className="space-y-6">
         <ConfigCantidad value={cantidad} onChange={setCantidad} />
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <button
             type="button"
             onClick={iniciar}
@@ -144,7 +144,7 @@ export function ExamEngine() {
 
   return (
     <section className="space-y-6">
-      <header className="flex items-center justify-between text-xs text-foreground/60">
+      <header className="flex flex-wrap items-center justify-between gap-2 text-xs text-foreground/60">
         <span>
           Pregunta {indice + 1} de {preguntas.length}
         </span>
@@ -196,7 +196,7 @@ export function ExamEngine() {
         </ul>
 
         {actual.resultado === null ? (
-          <div className="mt-5 flex items-center justify-between">
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
             <span className="text-xs text-foreground/60">
               {elegidas.length}/{cantidadAPedir} elegidas
             </span>
@@ -212,7 +212,7 @@ export function ExamEngine() {
         ) : (
           <div className="mt-5 space-y-3 border-t border-border pt-4">
             <FeedbackResultado pregunta={actual.pregunta} resultado={actual.resultado} />
-            <div className="flex justify-end">
+              <div className="flex justify-stretch sm:justify-end">
               <button
                 type="button"
                 onClick={siguiente}
@@ -243,7 +243,7 @@ function ConfigCantidad({
   return (
     <fieldset className="space-y-2">
       <legend className="text-sm font-medium">¿Cuántas preguntas querés practicar?</legend>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {CANTIDADES.map((c) => (
           <button
             key={c}

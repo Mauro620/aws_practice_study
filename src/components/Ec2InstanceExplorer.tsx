@@ -52,7 +52,7 @@ export function Ec2InstanceExplorer() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="m7gd.xlarge"
-            className="w-72 rounded-md border border-border bg-background px-3 py-2 font-mono text-sm outline-none focus:border-accent"
+            className="w-full max-w-sm rounded-md border border-border bg-background px-3 py-2 font-mono text-sm outline-none focus:border-accent"
             spellCheck={false}
             autoCapitalize="off"
           />
@@ -157,7 +157,7 @@ export function Ec2InstanceExplorer() {
           Tabla del material del curso. Útil para decidir qué familia mirar antes de elegir tamaño.
         </p>
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="min-w-[48rem] w-full text-left text-sm">
             <thead>
               <tr className="border-b border-border text-foreground/50">
                 <th className="py-2 pr-3 font-medium">Familia</th>

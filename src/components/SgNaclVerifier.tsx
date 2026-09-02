@@ -319,11 +319,11 @@ function CapaSg({
       />
 
       <div className="mt-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="text-sm font-medium text-foreground/70">
             Conexiones previas ({conexiones.length})
           </h3>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={onAgregarConexion}
@@ -373,7 +373,7 @@ function SubTabla({
   return (
     <div className="mt-3 overflow-x-auto">
       <h3 className="text-sm font-medium text-foreground/70">{titulo}</h3>
-      <table className="mt-2 w-full text-left text-sm">
+       <table className="mt-2 min-w-[34rem] w-full text-left text-sm">
         <thead>
           <tr className="border-b border-border text-foreground/50">
             <th className="py-1 pr-2 font-medium">Proto</th>
@@ -503,7 +503,7 @@ function CapaNacl({
       />
 
       <div className="mt-4 overflow-x-auto">
-        <table className="w-full text-left text-sm">
+        <table className="min-w-[42rem] w-full text-left text-sm">
           <thead>
             <tr className="border-b border-border text-foreground/50">
               <th className="py-1 pr-2 font-medium">#</th>

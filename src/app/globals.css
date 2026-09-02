@@ -20,6 +20,26 @@
 body {
   background: var(--background);
   color: var(--foreground);
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+}
+
+button,
+input:not([type='checkbox']):not([type='radio']):not([type='range']),
+select,
+summary {
+  min-height: 2.75rem;
+}
+
+button,
+select,
+summary {
+  touch-action: manipulation;
+}
+
+:where(a, button, input, select, summary):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .prose {
@@ -34,6 +54,22 @@ body {
 
 .prose :where(a):not(:where([class~="not-prose"] *)) {
   text-decoration-color: var(--border);
+}
+
+.prose :where(table):not(:where([class~="not-prose"] *)) {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: normal;
+}
+
+.prose :where(pre):not(:where([class~="not-prose"] *)) {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.prose :where(code):not(:where(pre code)):not(:where([class~="not-prose"] *)) {
+  overflow-wrap: anywhere;
 }
 
 @media (prefers-reduced-motion: reduce) {

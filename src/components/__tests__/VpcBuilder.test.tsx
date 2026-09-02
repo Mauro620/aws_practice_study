@@ -16,6 +16,7 @@ describe('VpcBuilder', () => {
   it('starts with a seeded example and flags the single-AZ setup', () => {
     render(<VpcBuilder />)
 
+    expect(screen.getByLabelText(/diagrama desplazable/i)).toBeInTheDocument()
     expect(filaDeSubred('Subred pública A')).toBeInTheDocument()
     expect(filaDeSubred('Subred privada A')).toBeInTheDocument()
     expect(screen.getByText(/solo tenés una az/i)).toBeInTheDocument()

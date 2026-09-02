@@ -63,7 +63,7 @@ export function RouteTableSimulator() {
               resultado.
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={agregarRuta}
@@ -82,7 +82,7 @@ export function RouteTableSimulator() {
         </div>
 
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="min-w-[46rem] w-full text-left text-sm">
             <thead>
               <tr className="border-b border-border text-foreground/50">
                 <th className="py-2 pr-3 font-medium">Destino (CIDR)</th>
@@ -156,7 +156,7 @@ export function RouteTableSimulator() {
             value={destinoIp}
             onChange={(e) => setDestinoIp(e.target.value)}
             placeholder="10.0.1.42"
-            className="w-48 rounded-md border border-border bg-background px-3 py-2 font-mono text-sm outline-none focus:border-accent"
+            className="w-full max-w-sm rounded-md border border-border bg-background px-3 py-2 font-mono text-sm outline-none focus:border-accent"
             aria-invalid={!ipValida}
           />
         </label>
@@ -200,7 +200,7 @@ export function RouteTableSimulator() {
                 <li
                   key={c.ruta.id}
                   className={
-                    'flex items-center justify-between rounded-md border px-3 py-2 ' +
+                    'flex flex-wrap items-start justify-between gap-2 rounded-md border px-3 py-2 ' +
                     (c.ruta.id === resultado.ganadora?.id
                       ? 'border-accent/40 bg-accent/10'
                       : 'border-border/60 bg-background')

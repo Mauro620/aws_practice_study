@@ -18,7 +18,7 @@ export async function ServicioView({ servicio }: { servicio: Servicio }) {
   )
 
   return (
-    <article className="mx-auto max-w-2xl px-4 py-10">
+    <article className="mx-auto max-w-2xl px-4 py-8 sm:px-6 sm:py-10">
       <p className="text-sm font-medium text-accent">
         Módulo {servicio.modulo} · {servicio.categoria}
       </p>

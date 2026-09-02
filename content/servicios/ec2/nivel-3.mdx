@@ -46,7 +46,7 @@ Tres servicios que cambian el juego cuando aparecen juntos:
 | **Spot Instances** | **Hasta 90 %** | Ninguno, pero AWS puede reclamar la instancia con **2 minutos de aviso** | Batch, CI/CD, renderizado, ML training — todo lo que tolere interrupciones |
 | **Dedicated Host / Instance** | Recargo | Hardware físico dedicado | BYOL, licencias por core, macOS, cumplimiento normativo |
 
-> La combinación inteligente es: **un ASG con la base en Savings Plans (el piso de carga estable) + Spot Instances para los picos**. Bajás el costo hasta 70 % respecto a On-Demand puro sin resignar elasticidad.
+> La combinación inteligente es: **un ASG con la base en Savings Plans (el piso de carga estable) + Spot Instances para los picos**. El ahorro exacto depende de qué proporción de la carga cubrís con cada modelo — no hay una cifra única del curso para la combinación, pero cada pieza sola llega hasta el 72 % (Savings Plans) o el 90 % (Spot) frente a On-Demand puro.
 
 #### Cómo encajan los demás componentes del nivel
 
