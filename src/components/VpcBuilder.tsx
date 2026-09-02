@@ -61,7 +61,7 @@ function AgregarSubredForm({ onAgregar }: { onAgregar: (s: Subred) => void }) {
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}
           placeholder="Subred pública B"
-          className="w-44 rounded-md border border-border bg-background px-2 py-1.5 outline-none focus:border-accent"
+          className="w-full rounded-md border border-border bg-background px-2 py-1.5 outline-none focus:border-accent sm:w-44"
         />
       </label>
       <label className="block text-sm">
@@ -185,7 +185,7 @@ function Diagrama({ estado }: { estado: EstadoVpc }) {
   const totalH = vpcH + 70
 
   return (
-    <svg viewBox={`0 0 ${vpcW + 40} ${totalH}`} role="img" aria-label="Diagrama de la VPC" className="h-auto w-full">
+    <svg viewBox={`0 0 ${vpcW + 40} ${totalH}`} role="img" aria-label="Diagrama de la VPC" className="h-auto min-w-[32rem] w-full">
       <text x={20} y={20} fontSize={11} fontWeight={600} fill={INK}>
         {estado.igwAdjunto ? 'Internet Gateway · adjuntado' : 'Internet Gateway · no adjuntado'}
       </text>
@@ -321,7 +321,9 @@ export function VpcBuilder() {
 
   return (
     <div className="not-prose space-y-8">
-      <Diagrama estado={estado} />
+      <div className="overflow-x-auto rounded-md border border-border/60" aria-label="Diagrama desplazable de la VPC">
+        <Diagrama estado={estado} />
+      </div>
 
       <div>
         <h3 className="text-lg font-semibold">Hallazgos</h3>
@@ -384,7 +386,7 @@ export function VpcBuilder() {
           <select
             value={estado.natGateway.subnetId ?? ''}
             onChange={(e) => moverNat(e.target.value || null)}
-            className="rounded-md border border-border bg-background px-2 py-1.5 outline-none focus:border-accent"
+            className="w-full max-w-sm rounded-md border border-border bg-background px-2 py-1.5 outline-none focus:border-accent"
           >
             <option value="">Sin colocar</option>
             {estado.subredes.map((s) => (

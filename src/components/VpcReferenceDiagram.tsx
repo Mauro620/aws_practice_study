@@ -58,7 +58,8 @@ function Node({ x, y, label }: { x: number; y: number; label: string }) {
 export function VpcReferenceDiagram() {
   return (
     <figure className="not-prose my-6">
-      <svg viewBox="0 0 640 400" role="img" aria-labelledby="vpc-diagram-title" className="w-full h-auto">
+      <div className="overflow-x-auto rounded-md border border-border/60" aria-label="Diagrama desplazable de la arquitectura VPC">
+      <svg viewBox="0 0 640 400" role="img" aria-labelledby="vpc-diagram-title" className="h-auto min-w-[40rem] w-full">
         <title id="vpc-diagram-title">
           Arquitectura de referencia: VPC con 2 Zonas de Disponibilidad, subredes públicas y privadas
         </title>
@@ -94,6 +95,7 @@ export function VpcReferenceDiagram() {
           replicación
         </text>
       </svg>
+      </div>
       <figcaption className="mt-2 text-sm text-foreground/60">
         Cada AZ repite el mismo patrón: subred pública con el balanceador y el NAT Gateway, subred privada con los
         servidores de aplicación y la base de datos.

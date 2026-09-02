@@ -152,7 +152,7 @@ export function AWSArchitectureGuide() {
       </div></header>
 
       <div className="grid gap-10 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-16">
-        <aside className="lg:sticky lg:top-8 lg:h-fit lg:self-start" aria-label="Contenido de la guía"><div className="-mx-1 overflow-x-auto pb-2 lg:mx-0 lg:overflow-visible lg:pb-0"><nav className="flex min-w-max gap-1 lg:block" aria-label="Secciones de la guía">
+        <aside className="lg:sticky lg:top-8 lg:h-fit lg:self-start" aria-label="Contenido de la guía"><div className="pb-2 lg:pb-0"><nav className="flex flex-col gap-1 lg:block" aria-label="Secciones de la guía">
           {tocSections.map((section) => <a key={section.id} href={`#${section.id}`} aria-current={activeId === section.id ? 'location' : undefined} className={`group flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-left text-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff9900] lg:mb-1 ${activeId === section.id ? 'bg-[#ff9900]/10 text-accent' : 'text-foreground/55 hover:bg-foreground/5 hover:text-foreground'}`}><span className="font-mono text-[10px] opacity-60">{section.number}</span><span>{section.title}</span></a>)}
         </nav></div><p className="mt-5 hidden border-t border-border pt-4 text-xs leading-5 text-foreground/55 lg:block">Navega por las etapas. El resaltado sigue tu posición automáticamente.</p></aside>
 

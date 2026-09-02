@@ -56,6 +56,14 @@ describe('AWSArchitectureGuide', () => {
     expect(runbookLink).toHaveAttribute('aria-current', 'location')
   })
 
+  it('keeps the mobile table of contents within the viewport', () => {
+    render(<AWSArchitectureGuide />)
+    const navigation = screen.getByRole('navigation', { name: 'Secciones de la guía' })
+
+    expect(navigation).toHaveClass('flex-col')
+    expect(navigation).not.toHaveClass('min-w-max')
+  })
+
   it('uses accessible native disclosures for the deep-dive topics', async () => {
     const user = userEvent.setup()
     render(<AWSArchitectureGuide />)

@@ -22,7 +22,7 @@ function NavList({ servicios }: { servicios: ServicioMeta[] }) {
         <li key={servicio.id}>
           <Link
             href={`/servicios/${servicio.id}`}
-            className="block rounded-md px-2 py-1.5 text-sm text-foreground/80 hover:bg-black/5"
+            className="block min-h-11 rounded-md px-2 py-2 text-sm text-foreground/80 hover:bg-black/5"
           >
             <span className="text-foreground/40">M{servicio.modulo}</span> {servicio.nombre}
           </Link>
@@ -37,7 +37,7 @@ function ToolsList() {
     <ul className="space-y-1">
       {TOOLS.map((tool) => (
         <li key={tool.href}>
-          <Link href={tool.href} className="block rounded-md px-2 py-1.5 text-sm text-foreground/80 hover:bg-black/5">
+          <Link href={tool.href} className="block min-h-11 rounded-md px-2 py-2 text-sm text-foreground/80 hover:bg-black/5">
             {tool.label}
           </Link>
         </li>

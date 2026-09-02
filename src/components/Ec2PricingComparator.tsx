@@ -236,7 +236,7 @@ export function Ec2PricingComparator() {
           cualquier precio por hora tiene que venir de la consola de AWS.
         </p>
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="min-w-[48rem] w-full text-left text-sm">
             <thead>
               <tr className="border-b border-border text-foreground/50">
                 <th className="py-2 pr-3 font-medium">Modelo</th>
