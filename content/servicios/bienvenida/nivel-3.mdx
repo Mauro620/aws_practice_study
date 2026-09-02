@@ -1,0 +1,83 @@
+---
+titulo: Caso realista — el arco del curso, laboratorio por laboratorio
+---
+
+El "caso realista" de este módulo no se parece al de EC2 o VPC: no hay diagrama ni configuración concreta. El realista es **el arco del curso completo** visto desde arriba: cómo va a evolucionar el sistema de la cafetería a lo largo de los laboratorios de desafío, y qué principios arquitectónicos se ponen en juego en cada etapa.
+
+## El arco en una línea
+
+> **Sitio web estático → aplicación dinámica → aplicación segura → aplicación escalable y resiliente → aplicación optimizada en costos.**
+
+Cinco laboratorios de desafío. En cada uno partís del estado del anterior y agregás una capa.
+
+## Laboratorio 1 — Sitio estático
+
+**Estado inicial:** la cafetería tiene una página en la web con fotos del local, el menú, la dirección y un número de WhatsApp. Es solo marketing.
+
+**Lo que se pone en juego:**
+
+- **Disponibilidad pública mínima.** Hosting que no requiera administrar servidores.
+- **Costo casi cero** mientras no haya tráfico.
+
+**Patrón que después se repite:** desacoplar **contenido estático** del resto. Cualquier cosa que sea texto, imagen o archivo descargable pertenece a esta capa — no a una base de datos ni a una función.
+
+## Laboratorio 2 — Aplicación dinámica
+
+**Estado siguiente:** agregás catálogo de productos, posibilidad de tomar pedidos online y consulta de disponibilidad de stock.
+
+**Lo que se pone en juego:**
+
+- **Computación.** Algo tiene que ejecutar código en respuesta a una solicitud.
+- **Persistencia.** Los pedidos, los productos y los clientes viven en algún lado.
+- **Acoplamiento débil** (loose coupling) entre el frontend y el backend. La regla clásica: si tenés un patrón de "una request → un servidor de aplicación", varios servidores web hablando con varios servidores de aplicación funcionan mejor con un balanceador en el medio que con una malla de conexiones.
+
+**Patrón que después se repite:** cada componente tiene una responsabilidad clara y se comunica con los demás por **puntos de contacto estables** (load balancers, APIs, colas), no por direcciones IP internas.
+
+## Laboratorio 3 — Aplicación segura
+
+**Estado siguiente:** la cafetería empieza a procesar datos de clientes y a manejar autenticación. Necesitás proteger el acceso.
+
+**Lo que se pone en juego:**
+
+- **Identidad.** Quién es cada usuario y qué puede hacer.
+- **Trazabilidad.** Quién hizo qué, cuándo, desde dónde.
+- **Cifrado.** Datos en reposo (disco, base, bucket) y datos en tránsito (TLS en cada hop).
+- **Defensa en profundidad.** Aplicar controles a nivel de red, de instancia y de aplicación, no solo en el perímetro.
+
+**Patrón que después se repite:** la seguridad **se aplica en todas las capas** y **se automatiza**. Las políticas se versionan en código igual que la aplicación.
+
+## Laboratorio 4 — Aplicación escalable y resiliente
+
+**Estado siguiente:** la cafetería tiene picos: hora del almuerzo, fines de semana, temporada de panettone en diciembre. Cuando un servidor cae, no puede caer el sitio entero.
+
+**Lo que se pone en juego:**
+
+- **Alta disponibilidad.** No depender de una sola máquina, una sola zona de disponibilidad, una sola región.
+- **Escalado automático.** Agregar capacidad cuando sube la demanda y quitarla cuando baja.
+- **Tolerancia a fallos.** Asumir que algo va a fallar y diseñar para que el sistema se recupere sin intervención humana.
+
+**Patrón que después se repite:** **suponer que todo falla** y diseñar en sentido inverso. Si un componente se cae, ¿qué pasa? Si una AZ se pierde, ¿qué pasa? Si una región entera se pierde, ¿qué pasa?
+
+## Laboratorio 5 — Aplicación optimizada en costos
+
+**Estado siguiente:** la factura de AWS creció. Hay que decidir qué instancias se mantienen 24/7, cuáles solo en horario laboral y cuáles son spot.
+
+**Lo que se pone en juego:**
+
+- **Modelos de compra.** On-Demand, Savings Plans, Reserved Instances, Spot, Dedicated Hosts.
+- **Dimensionamiento.** Ajustar tipo y tamaño de instancia a la carga real.
+- **Apagado programático.** Entornos de desarrollo fuera del horario.
+- **Observabilidad de costos.** Etiquetado (tags) desde el día uno para saber quién gasta qué.
+
+**Patrón que después se repite:** **pagar solo por lo que se usa** y cuestionarlo todo: instancias ociosas, transferencias entre regiones, almacenamiento duplicado, logs que nadie lee.
+
+## Lo que comparten los cinco laboratorios
+
+| Patrón | Aparece por primera vez en | Se vuelve crítico a partir de |
+| --- | --- | --- |
+| Desacoplamiento | Lab 2 | Lab 4 |
+| Identidad mínima viable | Lab 3 | Lab 3 en adelante |
+| Multi-AZ | Lab 4 | Lab 5 |
+| Etiquetado (tags) | Lab 1 (intuitivamente) | Lab 5 (FinOps) |
+
+La razón por la que este nivel no tiene un diagrama es que el diagrama **se construye solo** si internalizás el arco. Una vez que lo veas, cada servicio del catálogo se vuelve respuesta a una pregunta concreta: *"¿en qué laboratorio entra este servicio y bajo qué principio aparece?"*

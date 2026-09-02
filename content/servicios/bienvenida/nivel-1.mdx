@@ -1,0 +1,45 @@
+---
+titulo: La cafetería como analogía
+---
+
+Antes de tocar ningún servicio de AWS, este módulo invierte la lógica: AWS no es lo que se estudia; es el **telón de fondo** sobre el que se mueve una historia. La historia son **José, María, Sofía y Juan**, los dueños y el personal de una cafetería de barrio que creció hasta atraer clientes turistas y consultores de AWS.
+
+## El local, antes y después
+
+José y María abrieron el local en la planta baja de su edificio. Cocinan, atienden, charlan con los vecinos. El negocio empieza a crecer cuando los clientes — incluyendo varios consultores de AWS que pasan por ahí — les muestran cómo la nube puede ayudarlos a **automatizar aspectos del negocio, reducir el trabajo administrativo manual y mejorar la experiencia del cliente**.
+
+Lo importante de esta apertura es entender que toda la materia del curso es un **camino**:
+
+| Etapa | Lo que el cliente ve | Lo que cambia bajo el capó |
+| --- | --- | --- |
+| Laboratorio 1 | Un sitio web estático en la nube | Hosting básico, sin lógica de servidor |
+| Laboratorio 2 | Una aplicación dinámica | Computación y datos en la nube |
+| Laboratorio 3 | Una aplicación segura | Identidad, cifrado, capas de defensa |
+| Laboratorio 4 | Una aplicación escalable y resiliente | Multi-AZ, balanceo, tolerancia a fallos |
+| Laboratorio 5 | Una aplicación optimizada en costos | Modelos de compra, dimensionamiento, FinOps |
+
+Cada laboratorio de desafío parte del estado del anterior y agrega un capítulo más. Lo que se ve desde afuera — lo que el cliente pide — siempre es **negocio**: crecer, asegurar, soportar más usuarios, gastar menos.
+
+## Lo que cambia no es la meta, son los medios
+
+Si te quedás con una sola idea de este nivel, que sea esta: **el objetivo del curso no es aprender servicios sueltos, es aprender a tomar decisiones de arquitectura**. Cada servicio que vas a ver en los módulos siguientes es una herramienta al servicio de esa decisión. La cafetería existe para que cada decisión tenga un dueño y un contexto, no para ser decorativa.
+
+| Pregunta del cliente | Tipo de decisión | Ejemplo del curso |
+| --- | --- | --- |
+| "Quiero que más gente nos encuentre" | Disponibilidad pública | Sitio estático en S3 + CloudFront |
+| "Necesito guardar los pedidos" | Persistencia y modelo de datos | RDS, elección de motor, backups |
+| "Quiero que mi menú cambie según la hora" | Computación serverless | Lambda + API Gateway |
+| "Se cayó el sistema un sábado" | Alta disponibilidad | Multi-AZ, Auto Scaling |
+| "La factura de AWS creció" | Optimización de costos | Savings Plans, dimensionado, apagado de entornos no productivos |
+
+Mirá la columna del medio. Esas decisiones — y no el catálogo de productos — son las que se evalúan en el Marco de AWS Well-Architected que se estudia en detalle en Módulo 2.
+
+## Lo que NO hace falta memorizar
+
+Una trampa típica del curso es confundir el **decorado** con la **arquitectura**. La cafetería, los nombres propios y las preferencias de cada personaje son útiles para seguir la narrativa de los laboratorios, pero **no se evalúan**. Lo que sí importa:
+
+- **Quién hace qué** en la cafetería — porque en cada laboratorio adoptás un rol distinto.
+- **Qué consultores aparecen** — porque cada uno encarna una perspectiva técnica que ya intuye qué tipo de solución va a proponer.
+- **Cómo evoluciona el sistema** entre laboratorios — porque ese arco es la narrativa que después se evalúa criterio por criterio.
+
+El resto es color local para que el curso se disfrute mientras se aprende.

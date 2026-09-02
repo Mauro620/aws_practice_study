@@ -1,0 +1,72 @@
+---
+titulo: Bordes y trampas — seis hábitos que te separan del resto
+---
+
+Este nivel no tiene errores frecuentes del estilo "configurar mal un CIDR". Las trampas del Módulo 1 son **trampas de lectura**: cosas que parecen importantes y no lo son, o viceversa. Quien las evita entra al Módulo 2 con la cabeza ordenada.
+
+## Trampa 1 — Memorizar los seis objetivos como lista
+
+Los seis objetivos aparecen en el orden siguiente:
+
+1. Aplicar los principios arquitectónicos y las prácticas recomendadas.
+2. Utilizar los productos y características apropiados para una infraestructura **escalable, fiable y de alta disponibilidad**.
+3. Elegir productos **administrados** para conseguir mayor flexibilidad y resiliencia.
+4. **Mejorar el rendimiento y reducir los costos**.
+5. **Proteger el acceso** de usuarios, aplicaciones y datos.
+6. **Aplicar el Marco de AWS Well-Architected** para mejorar arquitecturas.
+
+Mirando los objetivos con cuidado, las palabras clave son: **operar, asegurar, ser fiable, rendir, optimizar y aplicar Well-Architected**. Es la misma lista de los seis pilares de Well-Architected que se estudian en el Módulo 2, casi uno a uno. Por eso el material te dice explícitamente: *si los memorizás ahora, el resto del curso encaja solo*. No memorices los seis objetivos como texto; memorizálos como **mapa de los pilares que vienen**.
+
+## Trampa 2 — Confundir los roles
+
+Los cinco roles de la nube no son para aprenderse. Son para **diferenciar al arquitecto de nube del resto**. El curso evalúa específicamente la diferencia entre:
+
+- **Profesional de TI vs arquitecto de nube.** No es una diferencia de seniority: es de **enfoque**. El profesional de TI administra infraestructura existente con amplitud; el arquitecto de nube **diseña** la arquitectura y **selecciona** qué tecnologías usar. Las dos tareas se necesitan mutuamente, pero no son la misma tarea.
+
+- **Desarrollador vs ingeniero de DevOps.** La regla corta del material: *"el desarrollador escribe el código de la aplicación; el ingeniero de DevOps escribe el código que la despliega y la configura"*. Si tu respuesta a un ejercicio menciona un Dockerfile, una pipeline CI/CD o Terraform, probablemente estás hablando de DevOps, no de desarrollo de aplicación. Si tu respuesta menciona una API, un SDK o un ORM, probablemente estás hablando del rol de desarrollador.
+
+- **Líder de TI ≠ jefe con menos conocimiento.** El líder es quien **decide** la tecnología al principio del proyecto. La implicación es crucial para los laboratorios: en los laboratorios **no hay líder de TI presente**, por lo que cuando un consultor propone una solución, no hay nadie validándola desde arriba — la decisión la terminás tomando vos en el rol de arquitecto.
+
+## Trampa 3 — Tratar a los consultores como decoración
+
+Olivia, Mónica y Mateo no son personajes para colorear la narrativa. **Cada uno encarna una perspectiva técnica** que ya intuye qué solución va a proponer. Si ignorás eso, vas a perder el anclaje conceptual cuando aparezcan en los laboratorios:
+
+| Cuando el consultor dice... | Implicás que la decisión es de tipo... | Pilar WA implicado |
+| --- | --- | --- |
+| "Yo lo balancearía con un ELB" (Olivia) | Diseño, redes | Eficacia del rendimiento, fiabilidad |
+| "Aquí va IAM + KMS + cifrado en tránsito" (Mónica) | Seguridad | Seguridad |
+| "Necesitamos replicar en otra región y un runbook" (Mateo) | Operaciones, DR | Fiabilidad, excelencia operativa |
+
+Tres consultores, tres pilares. Si los nombres se te confunden, no pasa nada; lo que se evalúa es que **reconozcas qué tipo de solución está proponiendo cada uno**.
+
+## Trampa 4 — Creer que la cafetería es el objetivo
+
+Sofía "se enteró recientemente de AWS" y habló con sus padres. Esa es la **línea de arranque** del curso. Después de eso, la cafetería es solo el contexto donde se toman decisiones reales de arquitectura.
+
+Lo que sí está en evaluación es **el arco de cinco etapas** (estático → dinámico → seguro → escalable y resiliente → optimizado en costos). Si en un examen te preguntan por una decisión, no importa el nombre de la cafetería. Importa qué pilar de Well-Architected está en juego y qué servicio lo materializa.
+
+## Trampa 5 — Subestimar la tabla de comparación de los cinco roles
+
+Es una de las pocas tablas que el material pide explícitamente que se memoricen de manera funcional. Si la tenés clara, cada vez que un ejercicio mencione *"el profesional a cargo"* o *"el equipo de operaciones"*, ya sabés qué tipo de decisiones toman y cuáles no. Si no la tenés clara, perdés tiempo decidiendo roles cuando la pregunta va sobre otra cosa.
+
+| Rol | Enfoque | Frase guía |
+| --- | --- | --- |
+| Profesional de TI | Generalista | Administra todo, sin profundidad. |
+| Líder de TI | Decide tecnología | Decide temprano, delega después. |
+| Desarrollador | Código de aplicación | Vive en API y SDK. |
+| Ingeniero de DevOps | Despliegue como código | Implementaciones repetibles. |
+| Arquitecto de nube | Diseño y selección | Decide *qué* y *con qué*. |
+
+## Trampa 6 — Creer que el resumen "Repaso rápido" cierra el módulo
+
+El módulo trae cinco preguntas finales que se llaman "Repaso rápido". Parecen triviales porque son abiertas ("¿qué rol adoptás y por qué?"), pero **son la forma en que el material te pide que construyas la conexión entre los cinco roles y los seis pilares**. Si las respondés mentalmente sin escribirlas, estás perdiendo el ejercicio de síntesis que el curso quiere que hagas.
+
+Cinco preguntas, cinco conexiones concretas:
+
+1. **Rol adoptado y por qué importa.** Conecta con el párrafo de "Arquitecto de nube" y, por tránsito, con el Marco de Well-Architected.
+2. **Profesional de TI vs arquitecto de nube.** Conecta con la trampa 2.
+3. **Transformación de la cafetería.** Conecta con el arco de cinco etapas (nivel 3).
+4. **Tres desafíos del rol de arquitecto de nube.** Conecta con los pilares de Well-Architected.
+5. **Quién es quién entre los consultores.** Conecta con la trampa 3.
+
+Esas cinco preguntas son también una autoevaluación: si las podés contestar sin volver al texto, entrás al Módulo 2 con la base que el curso necesita.

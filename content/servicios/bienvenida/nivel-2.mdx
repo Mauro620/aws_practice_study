@@ -1,0 +1,65 @@
+---
+titulo: Caso mínimo — los personajes y sus roles en la nube
+---
+
+El "caso mínimo" de este módulo no es una arquitectura: son los **personajes y sus responsabilidades**. Antes de recomendar nada, hay que saber quién pide qué y quién decide cómo se hace.
+
+## Los personajes del negocio
+
+| Persona | Rol en la cafetería | Perfil técnico |
+| --- | --- | --- |
+| **José** | Copropietario y panadero. | Ninguno. Aparte de tomarse selfies con sus creaciones, no es muy técnico. |
+| **María** | Copropietaria y socia de José. | Contadora retirada. Maneja hojas de cálculo, pero sin otra formación técnica. |
+| **Sofía** | Hija de José y María. Dirige las operaciones diarias: cadena de suministro de ingredientes y seguimiento del inventario. | Algunas clases de programación en secundaria. Planea empezar un título en Administración de Empresas. |
+| **Juan** | Empleado a tiempo parcial. Atiende el mostrador y otras tareas bajo la supervisión de Sofía. | Secundaria terminada y algo de experiencia en diseño visual. Quiere aprender desarrollo web y computación en la nube. |
+
+Dos observaciones que importan más que los nombres:
+
+- **Quien origina el pedido suele no ser quien decide la tecnología.** Sofía se entera de AWS y habla con sus padres. José y María aprueban, pero José y María no van a implementar nada. Tu interlocutor técnico real es Sofía; tu contraparte de aprobación es María.
+- **Hay alguien que aprende en el camino.** Juan, el del mostrador, es el que más se va a transformar en la ficción del curso. Cuando lo veas crecer en los laboratorios, no es casualidad: el curso asume que adoptás el rol y aprendés mientras diseñás.
+
+## Los consultores de AWS
+
+Tres visitantes frecuentes de la cafetería, amigos de Sofía y Juan, son consultores de AWS. Cada uno encarna una perspectiva distinta.
+
+| Consultor | Rol en AWS | Especialidad y contexto |
+| --- | --- | --- |
+| **Olivia** | Arquitecta de soluciones (SA) | Se mudó recientemente al centro de la ciudad. Experta en AWS y tecnologías de nube. Trabajó antes como ingeniera de redes y tiene sólida experiencia en bases de datos. |
+| **Mónica** | Desarrolladora | Completó hace poco una pasantía en AWS. Le gusta aplicar la tecnología adecuada a un problema empresarial. Obtuvo la certificación AWS Certified Security — Specialty y le interesan las soluciones de macrodatos. |
+| **Mateo** | Ingeniero de SysOps | Vasta experiencia. Experto en incorporar automatización y tolerancia a errores; le gusta diseñar para copias de respaldo y recuperación de desastres. Antes fue desarrollador y es el mentor de Mónica. |
+
+Regla práctica: cuando uno de ellos aparezca en un laboratorio, ya intuyes qué tipo de solución va a proponer.
+
+- **Olivia** → diseño, redes y bases de datos.
+- **Mónica** → desarrollo y seguridad.
+- **Mateo** → operaciones, automatización y recuperación ante desastres.
+
+Si en un ejercicio la respuesta correcta es **"usar un balanceador elástico"**, esperá que la proponga Olivia. Si es **"cifrar en tránsito y en reposo con KMS"**, esperá a Mónica. Si es **"replicar el bucket entre regiones para DR"**, esperá a Mateo. Esa tripleta se vuelve un mapa de razonamiento automático dentro de pocas semanas de práctica.
+
+## Los cinco roles de la nube
+
+Esto es lo que el curso evalúa. Los otros cuatro roles existen para que entiendas **qué hace** un arquitecto de nube al enfrentar cada uno en proyectos reales.
+
+| Rol | Enfoque | Frase que lo resume |
+| --- | --- | --- |
+| **Profesional de TI** | Generalista, amplia gama de habilidades | Administra toda la infraestructura, sin profundizar en cada servicio. |
+| **Líder de TI** | Administración y decisión tecnológica | Decide qué tecnología se usa y luego delega los detalles. |
+| **Desarrollador** | Código de aplicación | Escribe, prueba y corrige. Vive en API y SDK. |
+| **Ingeniero de DevOps** | Infraestructura y despliegue como código | Construye implementaciones repetibles; aprende experimentando. |
+| **Arquitecto de nube** | Diseño y selección tecnológica | Decide *qué* construir y *con qué*, y lo documenta para el equipo. |
+
+### Por qué el arquitecto de nube es el rol del curso
+
+El material pone tres marcadores fuertes sobre qué hace y por qué importa:
+
+- Dedica tiempo a **leer y mantenerse al día** con los últimos avances y tendencias.
+- Es responsable del **diseño de la arquitectura** y de **seleccionar qué tecnologías** usar.
+- Debe **conocer las capacidades** de las múltiples opciones disponibles para decidir cuáles adoptar según el requisito.
+
+Los desafíos comunes que enfrenta un arquitecto de nube son:
+
+- **Administración de recursos.**
+- **Optimización de costos.**
+- **Definir las prácticas recomendadas** de rendimiento, fiabilidad y seguridad.
+
+¿Suena familiar? Esos tres desafíos son literales los pilares 3, 5 y 2 del Marco de AWS Well-Architected. No es casualidad que se presente este rol antes de Well-Architected: el curso te está diciendo que **asumas esa perspectiva** desde el Módulo 1.
