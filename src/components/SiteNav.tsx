@@ -5,6 +5,7 @@ import type { ServicioMeta } from '@/lib/types'
 // the per-Servicio content tree, so they're listed here rather than derived
 // from content/servicios like NavList below.
 const TOOLS: { href: string; label: string }[] = [
+  { href: '/guia-arquitectura', label: 'Guía de arquitectura AWS' },
   { href: '/herramientas/cidr', label: 'Calculadora de CIDR' },
   { href: '/herramientas/rutas', label: 'Simulador de tablas de rutas' },
   { href: '/herramientas/ec2', label: 'Explorador de tipos de instancia EC2' },
