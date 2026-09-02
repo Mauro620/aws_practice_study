@@ -7,6 +7,9 @@
  *         default allow when no rules defined.
  *
  * Ports: integer port, range [puertoInicio, puertoFin], or 0 to mean ALL.
+ * A rule's port range always matches the packet's DESTINATION port, in or
+ * out — this is what makes an ephemeral-port outbound NACL rule necessary
+ * for replies (see network-acls.test.ts for the worked example).
  * Protocols: TCP | UDP | ICMP | ALL.
  * Stateful tracking: the evaluator accepts an optional list of "previously
  * established connections"; an outbound packet that matches the inverse of a
@@ -105,8 +108,12 @@ function puertoAplica(regla: { puertoInicio: number; puertoFin: number }, puerto
 
 function reglaSgMatchea(regla: ReglaSg, paquete: Paquete): boolean {
   if (!protocoloAplica(regla.protocolo, paquete.protocolo)) return false
-  const puertoRelevante = paquete.direccion === 'in' ? paquete.puertoDst : paquete.puertoSrc
-  if (!puertoAplica(regla, puertoRelevante)) return false
+  // A rule's port range always describes the packet's DESTINATION port,
+  // in or out: for "in" that's your service's port; for "out" that's the
+  // remote port you're connecting to (or, on a reply, the client's
+  // ephemeral port — which is exactly why a reply needs its own out rule,
+  // or the stateful shortcut below, instead of matching on the service port).
+  if (!puertoAplica(regla, paquete.puertoDst)) return false
   const ipRelevante = paquete.direccion === 'in' ? paquete.ipSrc : paquete.ipDst
   const cidr = parsearCidrSeguro(regla.cidr)
   const ip = ipInt(ipRelevante)
@@ -116,12 +123,11 @@ function reglaSgMatchea(regla: ReglaSg, paquete: Paquete): boolean {
 
 function reglaNaclMatchea(regla: ReglaNacl, paquete: Paquete): boolean {
   if (!protocoloAplica(regla.protocolo, paquete.protocolo)) return false
-  // NACL rules target the "server side" port of the flow:
-  //   in  -> destination port is the service (e.g. 22, 443)
-  //   out -> source port is the service (e.g. 22, 443)
-  // Source-port side is governed by a separate rule (ephemeral range).
-  const puertoServidor = paquete.direccion === 'in' ? paquete.puertoDst : paquete.puertoSrc
-  if (!puertoAplica(regla, puertoServidor)) return false
+  // Same rule as SG above: always match the packet's destination port. This
+  // is precisely why a reply (out, dst = the client's ephemeral port) needs
+  // an explicit 1024-65535 outbound rule — NACL is stateless, so matching
+  // against the service's own port here would silently let it through.
+  if (!puertoAplica(regla, paquete.puertoDst)) return false
   // The CIDR is the remote side (the side initiating the request).
   const ipRemota = paquete.direccion === 'in' ? paquete.ipSrc : paquete.ipDst
   const cidr = parsearCidrSeguro(regla.cidr)

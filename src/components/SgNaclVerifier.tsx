@@ -179,6 +179,7 @@ export function SgNaclVerifier() {
         sg={sg}
         resultado={resultado}
         conexiones={conexiones}
+        direccionActual={paquete.direccion}
         onAgregarRegla={agregarReglaSg}
         onEliminarRegla={eliminarReglaSg}
         onActualizarRegla={actualizarReglaSg}
@@ -243,6 +244,7 @@ type CapaProps = {
   sg: SecurityGroup
   resultado: ReturnType<typeof evaluarPaquete>
   conexiones: Conexion[]
+  direccionActual: Paquete['direccion']
   onAgregarRegla: (dir: 'in' | 'out') => void
   onEliminarRegla: (id: string) => void
   onActualizarRegla: (id: string, campo: keyof Omit<ReglaSg, 'id'>, valor: string | number) => void
@@ -254,6 +256,7 @@ function CapaSg({
   sg,
   resultado,
   conexiones,
+  direccionActual,
   onAgregarRegla,
   onEliminarRegla,
   onActualizarRegla,
@@ -267,7 +270,9 @@ function CapaSg({
         <div>
           <h2 className="text-lg font-semibold">Security Group (stateful)</h2>
           <p className="mt-1 text-sm text-foreground/60">
-            Default deny in, allow out. Si una conexión in es permitida, la respuesta sale sola.
+            En AWS real, el SG por defecto deniega todo entrante y permite todo saliente. Este simulador arranca
+            sin reglas out: agregá una regla out explícita o registrá la conexión de abajo para ver el atajo
+            stateful en acción.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -324,7 +329,7 @@ function CapaSg({
               onClick={onAgregarConexion}
               className="rounded-md border border-border bg-background px-2 py-0.5 text-xs hover:bg-black/5"
             >
-              Registrar paquete actual como conexión in
+              Registrar paquete actual como conexión previa ({direccionActual})
             </button>
             <button
               type="button"

@@ -115,6 +115,41 @@ describe('evaluarPaquete — Security Group (stateful)', () => {
     })
     expect(r.securityGroup.decisión).toBe('allow')
   })
+
+  it('SG out con regla explícita: matchea el puerto REMOTO (destino), no el puerto propio de origen', () => {
+    // La instancia inicia una conexión HTTPS hacia afuera: puertoDst=443 es
+    // el puerto del servidor remoto; puertoSrc=51000 es el efímero propio
+    // que el SO eligió. La regla out debe matchear contra el destino (443).
+    const sg: SecurityGroup = {
+      reglasIn: [],
+      reglasOut: [{ id: 'a', protocolo: 'TCP', puertoInicio: 443, puertoFin: 443, cidr: '0.0.0.0/0' }],
+    }
+    const r = evaluarPaquete(sg, [], {
+      direccion: 'out',
+      protocolo: proto('tcp'),
+      puertoSrc: 51000,
+      puertoDst: 443,
+      ipSrc: '10.0.0.5',
+      ipDst: '93.184.216.34',
+    })
+    expect(r.securityGroup.decisión).toBe('allow')
+  })
+
+  it('SG out con regla explícita: NO matchea solo porque el puerto de origen coincide', () => {
+    const sg: SecurityGroup = {
+      reglasIn: [],
+      reglasOut: [{ id: 'a', protocolo: 'TCP', puertoInicio: 443, puertoFin: 443, cidr: '0.0.0.0/0' }],
+    }
+    const r = evaluarPaquete(sg, [], {
+      direccion: 'out',
+      protocolo: proto('tcp'),
+      puertoSrc: 443,
+      puertoDst: 51000,
+      ipSrc: '10.0.0.5',
+      ipDst: '1.2.3.4',
+    })
+    expect(r.securityGroup.decisión).toBe('deny')
+  })
 })
 
 describe('evaluarPaquete — NACL (stateless, numerada, allow+deny)', () => {
@@ -181,10 +216,12 @@ describe('evaluarPaquete — NACL (stateless, numerada, allow+deny)', () => {
     expect(r.nacl.decisión).toBe('allow')
   })
 
-  it('NACL out: regla efímeros 1024-65535 requerida para respuesta TCP', () => {
-    // Caso típico: respuesta SSH. Sin reglas explícitas para efímeros, la
-    // respuesta con src=22 entra por la regla "TCP 22" → allow (porque la
-    // regla matchea el puerto del servidor, no del cliente).
+  it('NACL out: sin regla de puertos efímeros, la respuesta TCP se bloquea', () => {
+    // Caso típico: respuesta SSH. La regla "TCP 22" matchea el puerto de
+    // SERVICIO, no el destino real de este paquete (el puerto efímero del
+    // cliente, 50000) — por eso NO debe matchear, y sin otra regla que cubra
+    // 50000, la NACL deniega. Esto es justo el punto pedagógico de la
+    // sección 1.10: sin la regla 1024-65535 en outbound, la respuesta muere.
     const nacl: ReglaNacl[] = [
       { numero: 100, acción: 'allow', protocolo: 'TCP', puertoInicio: 22, puertoFin: 22, cidr: '0.0.0.0/0' },
     ]
@@ -196,8 +233,7 @@ describe('evaluarPaquete — NACL (stateless, numerada, allow+deny)', () => {
       ipSrc: '10.0.0.5',
       ipDst: '1.2.3.4',
     })
-    expect(r.nacl.decisión).toBe('allow')
-    expect(r.nacl.reglaAplicada && 'numero' in r.nacl.reglaAplicada ? r.nacl.reglaAplicada.numero : null).toBe(100)
+    expect(r.nacl.decisión).toBe('deny')
   })
 
   it('NACL in: regla efímeros 1024-65535 matchea paquetes con dst efímero (cliente detrás de NAT)', () => {
