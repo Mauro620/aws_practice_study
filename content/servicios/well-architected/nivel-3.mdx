@@ -1,0 +1,200 @@
+---
+titulo: Caso realista — once prácticas de diseño y cómo encajan con los pilares
+---
+
+El "caso realista" del Marco no es una sola arquitectura: es el conjunto de **once prácticas de diseño** que AWS desarrolló con sus clientes y que aplica cualquier equipo que use el Marco. Hay cuatro que el material desarrolla en detalle (escalabilidad, automatización, IaC, recursos desechables) y siete que se nombran como obligatorias pero cuya transcripción detallada falta en el material fuente; igualmente las cubrimos acá porque sin ellas no se entiende el resto.
+
+## Las once prácticas en una tabla
+
+| # | Práctica | Pilar principal |
+| --- | --- | --- |
+| 1 | Implementación de la escalabilidad | Eficacia del rendimiento + Fiabilidad |
+| 2 | Automatización del entorno | Excelencia operativa |
+| 3 | Infraestructura como código (IaC) | Excelencia operativa |
+| 4 | Tratamiento de los recursos como desechables | Excelencia operativa + Fiabilidad |
+| 5 | Acoplamiento débil | Fiabilidad |
+| 6 | Servicios, no servidores | Optimización de costos |
+| 7 | Elección de la base de datos adecuada | Eficacia del rendimiento |
+| 8 | Evitar puntos únicos de error | Fiabilidad |
+| 9 | Optimización para los costos | Optimización de costos |
+| 10 | Uso del almacenamiento en caché | Eficacia del rendimiento + Optimización de costos |
+| 11 | Protección de toda la infraestructura, en cada capa | Seguridad |
+
+La asociación con el pilar es aproximada; la mayoría sirve a más de uno. Lo importante es que **cada decisión arquitectónica que tomes tiene al menos una de estas prácticas como respaldo argumental**.
+
+## Prácticas 1 a 4 — las que el material desarrolla a fondo
+
+### 1. Implementación de la escalabilidad
+
+*Asegurate de que tu arquitectura pueda manejar los cambios en la demanda.*
+
+En AWS podés escalar la infraestructura con rapidez y de forma proactiva. Implementá la escalabilidad en cada capa, de modo que el diseño anticipe la necesidad de más capacidad y la entregue antes de que sea demasiado tarde.
+
+El ciclo automático:
+
+1. **Amazon CloudWatch** detecta que la carga total de la flota alcanzó un umbral definido — por ejemplo, *se mantuvo sobre el 60 % de uso de CPU durante más de 5 minutos*. También podés crear métricas personalizadas basadas en tu aplicación específica.
+2. Se invoca la **alarma**.
+3. **Amazon EC2 Auto Scaling** recibe la alerta y escala horizontalmente: inicia de inmediato una instancia nueva.
+4. El nuevo servidor está listo antes de que se alcance la capacidad total.
+5. Los usuarios rara vez experimentan una interrupción del servicio.
+
+> **Escalable no es lo mismo que elástico.** Escalar es *agregar* capacidad; ser elástico es también *retirarla*. Cuando la demanda disminuye, dejás de ejecutar — y de pagar — instancias que ya no necesitás.
+
+> **El antipatrón: escalado reactivo y manual.** Los servidores llegan a su capacidad total → se impide a los usuarios acceder → un administrador lanza instancias a mano → la instancia tarda varios minutos en estar disponible. Resultado: el tiempo sin acceso para el usuario se alarga todavía más.
+
+### 2. Automatización del entorno
+
+*Automatizá el aprovisionamiento, la terminación y la configuración de los recursos.*
+
+AWS ofrece herramientas integradas de supervisión y automatización en casi todas las capas de la infraestructura. Aprovéchalas para que tu infraestructura responda rápidamente a los cambios. Herramientas como CloudWatch y Amazon EC2 Auto Scaling detectan recursos en mal estado, automatizan el inicio de recursos de reemplazo y te notifican cuando cambian las asignaciones de recursos.
+
+Ejemplo de recuperación automática ante una falla:
+
+1. El servidor de aplicaciones falla.
+2. Amazon CloudWatch detecta de manera automática la instancia en mal estado.
+3. Una alarma notifica al administrador.
+4. Amazon EC2 Auto Scaling se inicia automáticamente y configura un servidor idéntico.
+5. CloudWatch registra automáticamente la acción en una solución de administración de cambios, para su seguimiento.
+
+> **Sin herramientas integradas:** vos detectás el error, vos se lo notificás al administrador, y el administrador inicia y configura el servidor nuevo a mano. Cada paso manual suma minutos de indisponibilidad y margen de error humano.
+
+### 3. Infraestructura como código (IaC)
+
+*Aprovisioná tu infraestructura informática mediante código en lugar de procesos manuales.*
+
+La automatización es un objetivo clave en cualquier entorno informático. La **infraestructura como código** automatiza la creación de entornos a partir de una plantilla; su uso más común es en el desarrollo de software, para crear, probar e implementar aplicaciones.
+
+| Beneficio | Por qué ocurre |
+| --- | --- |
+| Implementar rápidamente entornos duplicados | Con una sola plantilla desplegás entornos idénticos. IaC elimina los pasos manuales repetitivos y las listas de verificación. |
+| Reducir los errores de configuración | La configuración manual es propensa a errores por la participación humana. IaC los reduce y agiliza su comprobación. Si una actualización introduce un fallo, trasladás el código base al último archivo de configuración estable conocido. |
+| Propagar los cambios de forma coherente | Realizás un cambio en la plantilla y lo introducís en todas las pilas, de modo que se implemente de forma consistente. |
+
+> **Ventaja poco obvia:** como la infraestructura está versionada, también podés **deshacer entornos** a versiones anteriores de los archivos de configuración — por ejemplo para volver a implementar una versión anterior de la aplicación.
+
+### 4. Recursos como desechables
+
+*Aprovechá la naturaleza de aprovisionamiento dinámico de la computación en la nube.*
+
+Esta práctica se resume en una idea: **considerá tu infraestructura como software, no como hardware**.
+
+| Con hardware | Con recursos desechables en la nube |
+| --- | --- |
+| Comprás más componentes de los necesarios para prepararte ante los picos de uso. | Aprovisionás lo necesario y creás más bajo demanda. |
+| Caro e inflexible: es difícil actualizar por el costo irrecuperable. | Migrar entre instancias u otros recursos discretos es bastante sencillo. |
+| Responder a un cambio de capacidad toma semanas. | Respondés con rapidez, actualizás aplicaciones y administrás el software subyacente. |
+
+Algunos ejemplos de esto incluyen:
+
+- Automatizar la implementación de recursos nuevos con configuraciones idénticas.
+- Detener los recursos que no se utilizan.
+- Probar las actualizaciones en los recursos nuevos y luego reemplazar los viejos por los actualizados.
+
+> La forma clásica de recordarlo: **ganado, no mascotas**. A una mascota la curás cuando enferma; a un servidor ganadero simplemente lo reemplazás por otro idéntico.
+
+## Prácticas 5 a 11 — fondo del Marco que el material trata con menos detalle pero sigue vigente
+
+Las diapositivas perdidas del curso original desarrollan las siete prácticas restantes. Las recuperamos acá con la misma forma corta con la que el material las formula.
+
+### 5. Servicios débilmente acoplados
+
+Diseñá arquitecturas con componentes independientes. Lo recomendado: tres servidores web pasan por un **Elastic Load Balancing** que reparte a tres servidores de aplicación; los servidores web no conocen a los servidores de aplicación y el sistema soporta que cualquiera de ellos caiga sin afectar al resto. Lo no recomendado: tres servidores web con líneas directas a tres servidores de aplicación en malla completa. Cuando una caja se pierde, toda la malla se cae. El pilar servido es **Fiabilidad**: si los componentes no se acoplan, las fallas se aíslan.
+
+### 6. Diseño de servicios, no servidores
+
+Usá la variedad de servicios de AWS; **no limites tu infraestructura a servidores**. Considerá contenedores o solución sin servidor cuando corresponda. Las colas de mensajes pueden gestionar comunicación entre aplicaciones. Los activos web estáticos se pueden almacenar fuera del servidor (por ejemplo, en **Amazon S3**). Los servicios administrados de AWS pueden gestionar autenticación de usuarios y almacenamiento de estado de usuarios. El pilar servido es **Optimización de costos**: cada servicio administrado evita que tengas que operar uno hecho a mano.
+
+### 7. Elección de la base de datos adecuada
+
+Adaptá la tecnología a la carga de trabajo, no al revés. Antes de elegir, considerá:
+
+- Necesidades de lectura/escritura.
+- Requisitos de almacenamiento totales.
+- Tamaño habitual de los objetos y cómo se accede a ellos.
+- Requisitos de durabilidad.
+- Requisitos de latencia.
+- Número máximo de usuarios conectados al mismo tiempo.
+- Naturaleza de las consultas.
+- Intensidad necesaria de los controles de integridad.
+
+Pertenencia: **Eficacia del rendimiento** — y es exactamente la *compatibilidad mecánica* del pilar 4.
+
+### 8. Evitación de puntos únicos de error
+
+Asumí que todo falla. Luego, diseñá en sentido inverso. Si tu servidor de base de datos primario replica a un servidor secundario en espera y el primario se cae, el secundario recoge la carga automáticamente. La arquitectura se diseña *sabiendo* que una pieza va a fallar — no esperando que no pase. Pilar: **Fiabilidad**.
+
+### 9. Optimización de costos
+
+Aprovechá la flexibilidad de AWS para aumentar tu eficiencia de costos. Preguntas que vale hacerse:
+
+- ¿Mis recursos son del tamaño y tipo adecuados para el trabajo?
+- ¿Qué métricas debo supervisar?
+- ¿Cómo desactivo los recursos que no están en uso?
+- ¿Con qué frecuencia necesito usar este recurso?
+- ¿Puedo reemplazar cualquiera de mis servidores con servidores administrados?
+
+Pertenencia directa: **Optimización de costos**.
+
+### 10. Uso del almacenamiento en caché
+
+Minimizá las operaciones de recuperación de datos redundantes, mejorando el rendimiento y el costo. Una primera solicitud del archivo `dog.jpg` viaja usuario → CloudFront (nodo de periferia sin caché) → región (bucket S3 origen). La segunda solicitud y las siguientes se responden desde el nodo de periferia, que ya tiene `dog.jpg` cacheado y no vuelve al origen. Pertenencia: **Eficacia del rendimiento** + **Optimización de costos** (menos carga sobre el origen y menos transferencia desde la región).
+
+### 11. Protección de toda la infraestructura, en cada capa
+
+Incoporá seguridad en cada capa de tu infraestructura. Lista de prácticas operativas:
+
+- Usá servicios administrados.
+- Registrá el acceso a recursos.
+- **Aislá** partes de tu infraestructura.
+- **Cifrá** los datos en tránsito y en reposo.
+- Aplicá granularidad del control de acceso mediante principio de **mínimo privilegio**.
+- Usá autenticación multifactor (**MFA**).
+- **Automatizá** las implementaciones para mantener la coherencia de la seguridad.
+
+Pertenencia directa: **Seguridad**. Si cubrís estas siete prácticas operativas, ya estás aplicando el pilar 2 sin necesidad de auditoría.
+
+## Mapa visual: práctica → pilar servido
+
+```
+                    ┌───────────────────────────────────────────────┐
+                    │             Once prácticas de diseño          │
+                    └───────┬───────────────┬───────────────────────┘
+                            │               │
+                ┌───────────▼─────┐ ┌───────▼─────────────────────┐
+                │ Excelencia       │ │ Seguridad                   │
+                │ operativa        │ │  • Servicios administrados  │
+                │ • Automatización │ │  • Aislar componentes       │
+                │ • IaC            │ │  • Cifrado t/r              │
+                │ • Desechables    │ │  • MFA                      │
+                └───────────┬──────┘ │  • Mínimo privilegio        │
+                            │        └─────────────────────────────┘
+                            │
+                ┌───────────▼──────┐ ┌─────────────────────────────┐
+                │ Fiabilidad       │ │ Eficacia del rendimiento    │
+                │ • Acoplamiento   │ │  • Compatibilidad mecánica  │
+                │   débil          │ │  • Base de datos correcta   │
+                │ • Sin SPOF       │ │  • Caché                    │
+                │ • Escalabilidad  │ └─────────────────────────────┘
+                │ • Desechables    │
+                └──────────────────┘ ┌─────────────────────────────┐
+                                     │ Optimización de costos      │
+                                     │  • Servicios no servidores  │
+                                     │  • Right-sizing             │
+                                     │  • Apagado de no usados     │
+                                     └─────────────────────────────┘
+```
+
+Cada línea del mapa es el atajo mental que necesitás para los laboratorios y para el examen. Cuando un ejercicio te pide "recomendá una mejora en una arquitectura", la pregunta a hacerte siempre es: **"¿qué práctica me falta aplicar, y a qué pilar del Marco apunta?"**
+
+## Antipatrones esperados (lo que el curso llama "prácticas no recomendadas")
+
+El material del curso menciona que estas once prácticas tienen **antipatrones** documentados — patrones que razonablemente parecen buenas ideas pero producen exactamente el problema que se quiere evitar. La lista específica no se recupera del material fuente disponible para esta migración (las diapositivas que la contenían quedaron fuera del .md transcrito); quedan marcadas como **pendiente de verificación** en `docs/pendientes_fase.md`. Los nombres conocidos por sus prácticas simétricas son:
+
+| Práctica correcta | Antipatrón probable |
+| --- | --- |
+| Escalabilidad | Escalado reactivo y manual (documentado en práctica 1) |
+| Automatización del entorno | Intervención humana en cada paso de recuperación |
+| Acoplamiento débil | Malla completa de conexiones internas |
+| Evitar puntos únicos de error | Servidor único de base de datos |
+
+El resto de los antipatrones queda como pregunta abierta para cuando el material completo esté disponible.

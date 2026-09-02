@@ -1,0 +1,70 @@
+---
+titulo: El Marco como auditoría prestada
+---
+
+AWS vio miles de arquitecturas de clientes antes que la tuya. El Marco de AWS Well-Architected es el intento de **sistematizar lo aprendido** en forma de preguntas y prácticas recomendadas para que cualquier equipo pueda auditar su propio diseño.
+
+## El Marco como idea, no como trámite
+
+Lo más importante del Marco se suele pasar por alto: **no es una checklist para cumplir**. Es el conjunto de **preguntas básicas** que se repiten una y otra vez cuando un equipo senior mira una arquitectura. AWS las puso por escrito porque se cansó de explicar lo mismo en cada *design review*.
+
+En la nube hay cinco tipos de problemas que aparecen una y otra vez:
+
+- **No se sabe bien qué pasa dentro del sistema** durante la operación diaria.
+- **Una falla pequeña** se vuelve un corte grande porque hay una sola instancia, una sola AZ, una sola región.
+- **Se paga de más** porque nadie dimensionó, nadie apagó, nadie revisó la factura.
+- **Se eligió mal la tecnología** porque se partió de familiaridad en vez de patrón de acceso.
+- **Se rompió la seguridad** porque se aplicó solo en una capa, o porque nunca se automatizaron las pruebas de seguridad.
+
+El Marco no te dice qué servicios usar. Te dice las **preguntas correctas** que tienen que aparecer en tu *design review*. Eso es lo que se aprende en este módulo.
+
+## Los seis pilares como mnemotecnia
+
+| # | Pilar | Pregunta que responde |
+| --- | --- | --- |
+| 1 | **Excelencia operativa** | ¿Puedo ejecutar, observar y mejorar el sistema de forma continua? |
+| 2 | **Seguridad** | ¿Protejo la información, los sistemas y los activos? |
+| 3 | **Fiabilidad** | ¿Se recupera el sistema de fallas y se adapta a la demanda? |
+| 4 | **Eficacia del rendimiento** | ¿Uso los recursos de forma eficiente y lo mantengo al cambiar la demanda? |
+| 5 | **Optimización de costos** | ¿Evito gastos innecesarios? |
+| 6 | **Sostenibilidad** | ¿Maximizo la eficiencia y reduzco el desperdicio y el impacto ambiental? |
+
+Una sola línea para acordarlos:
+
+> *Operar seguro y fiable, rápido, barato y verde.*
+
+| Mnemotecnia | Pilar |
+| --- | --- |
+| Operar | Excelencia operativa |
+| Seguro | Seguridad |
+| Fiable | Fiabilidad |
+| Rápido | Eficacia del rendimiento |
+| Barato | Optimización de costos |
+| Verde | Sostenibilidad |
+
+Esa línea no es decoración. Si te quedás con el audio mental **"operar, asegurar, fiable, rápido, barato, verde"**, lo que viene del módulo entra por una puerta ya abierta.
+
+## La Herramienta AWS Well-Architected
+
+Una vez que se entiende la idea, la Herramienta en la consola es el vehículo concreto: permite revisar una carga de trabajo contra los seis pilares, registrar las mejoras identificadas y volver a medirlas en el tiempo. No la uses como *compliance*; usala como **memoria institucional** de las decisiones de arquitectura.
+
+Típicamente lo que pasa cuando un equipo la aplica es:
+
+- **Aparecen "alto riesgo"** donde el equipo creía que estaba todo bien (puntos únicos de fallo sin documentar, alarmas configuradas que nunca se dispararon).
+- **Aparecen "mejora conveniente"** que se postergan indefinidamente (etiquetado, pruebas de carga, runbooks de DR).
+- **El equipo se pone de acuerdo** sobre qué es prioritario: la herramienta no decide por vos, pero fuerza a discutir cada pregunta.
+
+## La conexión con Módulo 1
+
+Esto se dijo antes y vuelve a aparecer aquí porque es importante: **los seis objetivos del Módulo 1 son los seis pilares del Marco, casi uno a uno**. Quien memorizó los objetivos del curso ya memorizó los pilares sin darse cuenta. La pieza nueva del Módulo 2 es el nombre técnico (Excelencia operativa, Seguridad, Fiabilidad, Eficacia del rendimiento, Optimización de costos, Sostenibilidad) y la lista de prácticas de diseño que se desarrollan en el resto del módulo.
+
+| Objetivo del curso (Módulo 1) | Pilar del Marco (Módulo 2) |
+| --- | --- |
+| Aplicar principios y prácticas recomendadas | Excelencia operativa |
+| Proteger el acceso | Seguridad |
+| Productos para infraestructura fiable y de alta disponibilidad | Fiabilidad |
+| Mejorar el rendimiento | Eficacia del rendimiento |
+| Reducir los costos | Optimización de costos |
+| Aplicar el Marco | Sostenibilidad + la Herramienta como vehículo |
+
+Quien entra al Módulo 2 con esta tabla en la cabeza ya tiene media lección entendida.

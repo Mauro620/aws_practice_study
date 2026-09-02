@@ -1,0 +1,29 @@
+{
+  "id": "bienvenida",
+  "nombre": "Le damos la bienvenida a AWS Academy Cloud Architecting",
+  "categoria": "Curso",
+  "modulo": 1,
+  "prerequisitos": [],
+  "resumenUnaLinea": "Objetivos del curso, el escenario de la cafetería que vas a usar en cada laboratorio, los consultores que te asesoran y los cinco roles de la computación en la nube, con foco en el rol de arquitecto/a.",
+  "erroresFrecuentes": [
+    { "descripcion": "Memorizar los seis objetivos del curso sin entenderlos como espejo de los pilares de Well-Architected — son la misma lista con otro corte." },
+    { "descripcion": "Confundir al profesional de TI con el arquitecto de nube: el primero es generalista que administra infraestructura existente; el segundo diseña y selecciona tecnologías." },
+    { "descripcion": "Tratar al desarrollador y al ingeniero de DevOps como sinónimos: el desarrollador escribe el código de la aplicación; DevOps escribe el código que la despliega y la configura." },
+    { "descripcion": "Subestimar al líder de TI: no es el 'jefe que sabe menos', es quien decide la tecnología al principio y luego delega el detalle." },
+    { "descripcion": "Creer que el arco del curso (estático → dinámico → seguro → escalable y resiliente → optimizado en costos) es solo temario: es la propia evaluación de la arquitectura que terminarás haciendo en cada laboratorio." },
+    { "descripcion": "No mapear cada consultor con su perspectiva: Olivia = arquitectura/redes/datos, Mónica = desarrollo/seguridad, Mateo = operaciones/automatización/recuperación." }
+  ],
+  "glosario": [
+    { "termino": "AWS Well-Architected", "definicion": "Marco de AWS con seis pilares para evaluar y mejorar arquitecturas de nube (ver Módulo 2)." },
+    { "termino": "Arquitecto de nube", "definicion": "Rol que diseña la arquitectura y selecciona qué tecnologías usar; es la perspectiva que adoptarás durante todo el curso." },
+    { "termino": "Profesional de TI", "definicion": "Generalista que administra la infraestructura de una aplicación completa, con amplitud pero no profundidad en cada servicio." },
+    { "termino": "Líder de TI", "definicion": "Decide qué tecnología se usará al inicio del proyecto y luego delega los detalles al equipo." },
+    { "termino": "Desarrollador", "definicion": "Escribe, prueba y corrige el código de la aplicación. Trabaja con API y SDK." },
+    { "termino": "Ingeniero de DevOps", "definicion": "Escribe el código que instala y configura los despliegues: IaC, pipelines, implementaciones repetibles." },
+    { "termino": "DevOps", "definicion": "Disciplina y rol que une desarrollo y operaciones, llevando ingeniería a las necesidades de los equipos de operaciones." },
+    { "termino": "Laboratorio de desafío (cafetería)", "definicion": "Formato práctico del curso donde asumís un rol del personal de la cafetería y recibís asesoría de los consultores de AWS para diseñar una solución en la nube." },
+    { "termino": "Consultor de AWS", "definicion": "Personaje que te asesora en los laboratorios; cada consultor encarna una perspectiva técnica (arquitectura, desarrollo, operaciones)." },
+    { "termino": "Administración de recursos", "definicion": "Uno de los tres desafíos centrales del rol de arquitecto de nube: gestionar qué servicios existen y cómo se relacionan." }
+  ],
+  "preguntas": []
+}
