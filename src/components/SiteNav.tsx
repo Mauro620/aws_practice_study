@@ -10,6 +10,7 @@ const TOOLS: { href: string; label: string }[] = [
   { href: '/herramientas/ec2', label: 'Explorador de tipos de instancia EC2' },
   { href: '/herramientas/sg-nacl', label: 'Verificador SG vs NACL' },
   { href: '/herramientas/comparador-costos', label: 'Comparador de costos EC2' },
+  { href: '/herramientas/motor-practica', label: 'Motor de práctica tipo examen' },
   { href: '/herramientas/constructor-vpc', label: 'Constructor visual de VPC' },
 ]
 
