@@ -1,0 +1,83 @@
+---
+titulo: Bordes y trampas
+---
+
+EC2 es la superficie más amplia del curso. Hay errores frecuentes que casi todo el mundo comete al principio, y bordes de la API que conviene tener en cuenta porque la mayoría de las preguntas de examen salen de acá.
+
+#### El modelo de responsabilidad compartida: AWS hace la mitad, vos la otra mitad
+
+AWS es responsable de la seguridad **DE** la nube (hardware, hipervisor, red física, energía). Vos sos responsable de la seguridad **EN** la nube: sistema operativo, parches, firewall, claves, cifrado de datos. Esto significa que **actualizar el SO es tu trabajo** — una instancia de Amazon Linux 2023 con `dnf update` de hace un año es vulnerable y AWS no la va a parchear automáticamente.
+
+#### AMI y arquitectura tienen que coincidir
+
+Una AMI ARM64 (Graviton) **no arranca** en una instancia Intel/AMD y viceversa. El error típico es elegir una AMI optimizada para Graviton porque es más barata y olvidarse de que el tipo de instancia sea también ARM. Si tu software es compilado, verificá antes que exista binario ARM.
+
+#### Licencias embebidas en el precio por hora
+
+Windows, RHEL, SUSE, SQL Server: la licencia **se paga dentro del precio de la instancia**, no por separado a Microsoft o Red Hat. Windows puede salir **1,5× a 2×** más que la misma instancia con Linux; SQL Server Enterprise mucho más. **Windows factura por hora completa iniciada**; Linux factura por segundo con mínimo de 60 segundos. La diferencia es enorme en cargas cortas.
+
+#### Key Pair: si perdés el `.pem`, perdés la instancia
+
+La clave privada se descarga **una sola vez** en el momento de crearla. AWS no guarda copia. Si se pierde:
+
+1. Detener la instancia.
+2. Desmontar el volumen EBS raíz.
+3. Montar el volumen en otra instancia como volumen de datos.
+4. Editar `~/.ssh/authorized_keys` con una clave nueva.
+5. Devolver el volumen a la instancia original y arrancarla.
+
+Es largo y manual. Por eso se recomienda Session Manager, que no necesita key pair ni puerto 22 abierto.
+
+#### El Security Group está atado a la ENI, no a la instancia
+
+Regla que confunde: si asociás una ENI (Elastic Network Interface) a otra instancia, **el Security Group viaja con la ENI**, no con la instancia. Esto es la base de algunas técnicas de failover pero también es fuente de errores: perder la pista de qué SG está activo en qué interfaz.
+
+#### IP pública cambia en cada stop/start
+
+La IP pública de una instancia es **efímera**: se libera al hacer *stop* y se asigna una nueva al hacer *start*. Si tenés DNS o conexiones que apuntan a esa IP, se rompen. Soluciones:
+
+| Solución | Cuándo conviene |
+| --- | --- |
+| **Elastic IP** | Una IP fija reservada a tu cuenta. Se cobra si queda sin asociar |
+| **ALB en frente** | La mejor opción en producción: el DNS apunta al balanceador, no a la instancia |
+| **Route 53 con health check** | Complemento del ALB para failover DNS |
+
+#### "Delete on Termination" activado por defecto en el volumen raíz
+
+Si terminás la instancia sin desactivar esta casilla, el volumen raíz y todos sus datos se **destruyen sin recuperación posible**. Para datos importantes: desactivarla, o guardar los datos fuera de la instancia (S3, RDS, EFS). Es la casilla más peligrosa del lanzamiento.
+
+#### Cifrar el volumen después es caro
+
+El cifrado con KMS conviene activarlo **al crear** el volumen. Cifrar un volumen existente no se puede: hay que tomar un snapshot, copiarlo con cifrado, crear un volumen nuevo del snapshot y reemplazar el original.
+
+#### El costo de transferencia entre AZ se cobra en ambos sentidos
+
+Tráfico entre AZ distintas dentro de la misma región: **se cobra la salida**. Tráfico dentro de la misma AZ por IP privada: gratis. Por eso un diseño multi-AZ con un solo NAT Gateway termina pagando doble: el NAT cobra sus GB/hora y la transferencia entre AZ también. La práctica correcta es un NAT por AZ.
+
+#### T instancias: créditos de CPU
+
+Las `t3`, `t3a`, `t4g` son **burstable**: rinden bajo un nivel base la mayor parte del tiempo y acumulan créditos para usarlo en picos. Si la carga es constante, esos créditos se agotan y la instancia se vuelve lentísima. Para carga constante, usar familia **M** o **C**.
+
+#### Instance Store no es disco persistente
+
+El Instance Store (letra `d` en tipos como `m6gd` o `i4i`) es NVMe físico del host. Se pierde al *stop*, al *terminate*, o si el hardware falla. Sobrevive a un *reboot* simple. **Nunca** guardar datos únicos ahí: solo cachés, buffers, archivos temporales.
+
+#### Rol IAM, nunca claves dentro
+
+**Nunca** guardar Access Key / Secret Key (`AKIA...`) dentro de la instancia. La forma correcta es asignar un **Instance Profile** (rol IAM). AWS entrega credenciales **temporales y rotadas automáticamente** vía el servicio IMDS (dirección `169.254.169.254`). El rol se puede cambiar en caliente, sin reiniciar.
+
+#### IMDSv2 obligatorio para producción
+
+IMDSv1 está expuesto a ataques SSRF. IMDSv2 exige primero un PUT para obtener un token, y después cualquier consulta lleva ese token en el header. Recomendación: forzar IMDSv2 como **Required** en todas las instancias nuevas. Una app legada con IMDSv1 sigue funcionando, pero conviene migrar.
+
+#### Stop ≠ Terminate, e hibernated ≠ stopped
+
+| Estado | ¿Cobra cómputo? | Conserva | |
+| --- | --- | --- | --- |
+| *stopped* | No | Volumen raíz + IP privada | Pierde IP pública y instance store |
+| *hibernated* | No | Lo mismo + RAM volcada al disco | Al reanudar retoma el estado exacto |
+| *terminated* | No | Nada | Irreversible. Activar Termination Protection si dudás |
+
+#### Tags desde el día uno
+
+Si no etiquetás, después es imposible saber quién generó qué gasto. La factura de AWS no te dice "esta instancia la creó María", te dice "esta instancia con InstanceID i-0abc1234 corrió X horas". Los tags son el único mapa entre consumo y responsable. Mínimo: `Name`, `Environment`, `Owner`, `Project`.

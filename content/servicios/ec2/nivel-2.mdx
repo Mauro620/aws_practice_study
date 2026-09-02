@@ -1,0 +1,39 @@
+---
+titulo: Caso mínimo
+---
+
+El ejemplo mínimo que efectivamente funciona. Asumimos que ya tenés una VPC con subred pública y route table con ruta `0.0.0.0/0 → igw-…` (ver Servicio 1 nivel-2). Lo que agregamos ahora es la instancia en sí.
+
+1. **Elegís la AMI** (la plantilla con el sistema operativo). Para un Linux, esto casi siempre es Amazon Linux 2023 — gratis, integrado, con AWS CLI y SSM Agent preinstalados.
+2. **Elegís el tipo de instancia** (el hardware virtual). Para una PC de oficina promedio, una `t3.micro` o `m6i.large` alcanza. Hay que coincidir la arquitectura del SO con la del procesador (Intel/AMD para AMIs x86, Graviton para AMIs ARM).
+3. **Elegís o creás un Key Pair.** Es el archivo `.pem` que necesitás para entrar por SSH. Si lo perdés, perdés el acceso a esa instancia. (Windows usa `.ppk`.)
+4. **Elegís la subred.** Esto define la AZ y la IP privada que va a tener la instancia, y no se puede cambiar después.
+5. **Activás "Auto-assign Public IP"** si querés que reciba una IP pública efímera al arrancar.
+6. **Configurás el almacenamiento** (tamaño y tipo de volumen EBS raíz). Por defecto, un volumen gp3 de 8 GB en Linux.
+7. **Asignás un Security Group** (o creás uno nuevo). Mínimo privilegio: SSH/22 solo desde tu propia IP, no `0.0.0.0/0`.
+8. **(Opcional) Pegás un script de User Data** que se ejecute como root en el primer arranque.
+9. **(Si la instancia necesita acceder a servicios AWS) Asignás un rol IAM** desde el asistente. Jamás claves de acceso estáticas adentro.
+
+Una vez lanzada, la instancia aparece en estado *running* en pocos minutos. Ese es el orden: primero la red, después el cómputo.
+
+| # | Decisión | Por qué |
+| --- | --- | --- |
+| 1 | AMI = Amazon Linux 2023 | Gratis, integrado, mantenimiento incluido |
+| 2 | Tipo = t3.micro o m6i.large | Suficiente para web pequeña o app server |
+| 3 | Key Pair nuevo, descargar `.pem` y guardarlo en lugar seguro | Sin esto no se entra por SSH |
+| 4 | Subred pública con NAT/IGW | Para que tenga salida a Internet |
+| 5 | IP pública asignada | Hace falta si va a ser accesible desde fuera |
+| 6 | Volumen raíz gp3, 8 GB | Lo mínimo razonable; gp3 es el default moderno |
+| 7 | Security Group mínimo (SSH solo a tu IP) | Superficie de ataque mínima |
+| 8 | User Data para automatizar el primer arranque | Para que sea reproducible |
+| 9 | Rol IAM en vez de claves dentro | Las credenciales rotan solas, no se filtran |
+
+> Toda decisión del lanzamiento **queda registrada** en los Tags. Usá los tags desde el día uno: `Name`, `Environment`, `Owner`, `Project`. Después, cuando la factura llegue, son la única forma de saber quién gasta qué.
+
+#### Tres combinaciones mínimas según el caso
+
+| Caso | AMI | Tipo | Subred | IP pública | SG abierto a |
+| --- | --- | --- | --- | --- | --- |
+| **Servidor web público** | Amazon Linux 2023 | t3.micro | Pública | Sí | 80, 443 desde `0.0.0.0/0` |
+| **App server privado** | Amazon Linux 2023 | m6i.large | Privada | No | Solo desde el SG del balanceador |
+| **Base de datos** | Amazon Linux 2023 | r6i.large | Privada | No | Solo desde el SG de la app |

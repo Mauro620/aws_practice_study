@@ -1,0 +1,41 @@
+---
+titulo: Analogía
+---
+
+Volvé al edificio de la analogía del Servicio 1 (VPC). El edificio ya tiene pisos y cableado de red, pero los pisos están vacíos. Ahora hay que amueblarlos: meter una PC, instalar el sistema operativo, conectarla a la red del piso y empezar a correr aplicaciones. Esa PC es una **instancia EC2**.
+
+Imaginá la PC como una **computadora servidor completa**:
+
+- Es **virtual**, no física. No hay un gabinete que puedas tocar: el hardware lo sigue administrando AWS. Lo que vos obtenés es un **servidor arrancado y listo** que administrás vos.
+- Es **arrancable y borrable en minutos**: la encendés cuando la necesitás, la apagás cuando no. Cada vez que la encendés, AWS elige qué hardware físico la hostea; la próxima podría caer en otro servidor del piso.
+- Es **pagás por tiempo de uso**: mientras está encendida, se cobra. Apagada (en estado *stopped*), **no se cobra el cómputo**, aunque el disco y la IP reservada sí siguen facturando.
+- Vive **siempre dentro de un piso de un edificio** (subred de una VPC). No existe una instancia EC2 sin subred; tampoco puede cambiar de subred una vez creada.
+
+#### Comparación con servicios equivalentes
+
+| EC2 (IaaS) | Lambda (FaaS) | Elastic Beanstalk (PaaS) |
+| --- | --- | --- |
+| Tenés un servidor completo: instalás el SO, lo actualizás, administrás todo arriba | Subís solo el código; AWS administra todo lo demás | Subís tu app; AWS crea y administra las instancias por vos |
+| Máximo control, máxima responsabilidad | Cero administración, restricciones de tamaño y tiempo | Balance entre control y delegación |
+
+> Regla rápida para ubicarse: EC2 es **infraestructura como servicio** (IaaS) en estado puro. Tenés un servidor real, con sistema operativo real, y vos decidís qué hacer con él — pero **vos** lo mantenés actualizado, **vos** lo securizás, **vos** lo parchás. AWS es responsable de la seguridad DE la nube, no EN la nube.
+
+#### Qué hereda automáticamente la instancia de su subred
+
+| Característica | Quién la decide | ¿Se puede cambiar después? |
+| --- | --- | --- |
+| IP privada (rango de la subred) | Subred | No |
+| AZ (centro de datos físico) | Subred | No |
+| Tabla de rutas | Subred | No directamente |
+| IP pública (si está activada la asignación automática) | Subred + atributo de la instancia | Cambia en cada *stop/start* |
+| Security Group | Lo elegís al lanzar | Sí, en cualquier momento |
+
+| Mundo físico (la PC del piso) | Amazon EC2 |
+| --- | --- |
+| Una PC/servidor físico | Una instancia EC2 |
+| El sistema operativo instalado | La **AMI** desde la que se lanzó la instancia |
+| Tu usuario y contraseña locales | El **Key Pair** para entrar por SSH (sin contraseña) |
+| El firewall de Windows / iptables de Linux | El **Security Group** asociado |
+| Las bandejas de disco dentro del gabinete | **EBS** + opcional **Instance Store** |
+| Dirección IP asignada por el router del piso | IP privada del rango de la subred |
+| Dirección IP pública del ISP | IP pública efímera o **Elastic IP** |

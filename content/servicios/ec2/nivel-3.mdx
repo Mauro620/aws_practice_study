@@ -1,0 +1,59 @@
+---
+titulo: Caso realista
+---
+
+Una sola instancia en una sola AZ es un prototipo, no una arquitectura. En producción las cosas se distribuyen, se replican y se reemplazan solas. Acá entra el resto de la familia.
+
+#### La arquitectura de alta disponibilidad estándar
+
+```
+                    Internet
+                       │
+            ┌──────────▼──────────┐
+            │   ALB (Application  │
+            │   Load Balancer)     │
+            └─────┬────────┬───────┘
+                  │        │   (2+ subredes públicas,
+                  │        │    una por AZ)
+                  ▼        ▼
+            ┌─────────┐  ┌─────────┐
+            │ Insta-  │  │ Insta-  │
+            │ ncia    │  │ ncia    │    ASG: mantiene N instancias
+            │ EC2     │  │ EC2     │    entre min y max
+            └────┬────┘  └────┬────┘
+                 │            │      (subredes privadas, una por AZ)
+                 ▼            ▼
+            ┌────────────────────────┐
+            │     RDS Multi-AZ       │   primaria + standby
+            └────────────────────────┘
+```
+
+Tres servicios que cambian el juego cuando aparecen juntos:
+
+| Servicio | Qué resuelve | Cómo se relaciona con EC2 |
+| --- | --- | --- |
+| **Auto Scaling Group (ASG)** | Mantener un número sano de instancias y reemplazar las que caen | Usa un **Launch Template** para crear instancias EC2 cuando hace falta; las termina cuando sobran |
+| **Elastic Load Balancer (ALB)** | Distribuir tráfico entre instancias en distintas AZ | La **target group** apunta al ASG, no a instancias puntuales |
+| **Launch Template** | Plantilla declarativa con AMI, tipo, SG, Key Pair y User Data | Es lo que consume el ASG; **garantiza que cada nueva instancia sea idéntica** a las anteriores |
+
+#### Modelos de compra, uno por uno
+
+| Modelo | Descuento vs. On-Demand | Compromiso | Cuándo conviene |
+| --- | --- | --- | --- |
+| **On-Demand** | 0 % | Ninguno | Cargas impredecibles, dev, pruebas, primer despliegue |
+| **Savings Plans** | Hasta 72 % | 1 o 3 años de gasto por hora | Cargas estables; **más flexible que las RI**, aplica entre familias y regiones |
+| **Reserved Instances** | Hasta 72 % | 1 o 3 años de un tipo específico | Cargas totalmente predecibles; ya casi reemplazadas por Savings Plans |
+| **Spot Instances** | **Hasta 90 %** | Ninguno, pero AWS puede reclamar la instancia con **2 minutos de aviso** | Batch, CI/CD, renderizado, ML training — todo lo que tolere interrupciones |
+| **Dedicated Host / Instance** | Recargo | Hardware físico dedicado | BYOL, licencias por core, macOS, cumplimiento normativo |
+
+> La combinación inteligente es: **un ASG con la base en Savings Plans (el piso de carga estable) + Spot Instances para los picos**. Bajás el costo hasta 70 % respecto a On-Demand puro sin resignar elasticidad.
+
+#### Cómo encajan los demás componentes del nivel
+
+| Componente EC2 | Relación con la arquitectura |
+| --- | --- |
+| **AMI** | Cambiarla en el Launch Template cambia todas las instancias futuras. Es la palanca para desplegar una nueva versión |
+| **Tipo de instancia** | El ASG lo respeta; cambiar el tipo en el Launch Template requiere terminar y recrear instancias (no en caliente) |
+| **User Data** | Se ejecuta en cada nueva instancia que el ASG lance. Es el lugar para instalar paquetes y arrancar servicios |
+| **Rol IAM** | Lo lleva cada instancia creada por el ASG, igual que las manuales |
+| **Elastic IP** | No se usa acá: si la instancia cambia, la IP pública la reemplaza el ALB, que es el punto estable |
