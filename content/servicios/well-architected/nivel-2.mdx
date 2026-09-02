@@ -1,0 +1,127 @@
+---
+titulo: Caso mínimo — los seis pilares uno por uno
+---
+
+Este nivel es la "tabla periódica" del curso: los seis pilares, cada uno con su pregunta, su objetivo y los principios que lo componen. La idea es terminar el nivel sabiendo **qué pregunta responde cada pilar** y **con qué tecnología AWS material se implementa**.
+
+## Pilar 1 — Excelencia operativa
+
+**Pregunta:** *¿Puedo ejecutar, observar y mejorar el sistema de forma continua?*
+
+**Qué aborda:** la capacidad de ejecutar sistemas y obtener información sobre sus operaciones para entregar valor empresarial, y de mejorar continuamente los procesos y procedimientos de apoyo.
+
+Al diseñar una carga de trabajo para operaciones, debés saber cómo se **implementará, actualizará y operará**. Tres principios de aplicación:
+
+- **Ingeniería orientada a la calidad** — prácticas alineadas con la reducción de defectos y con correcciones rápidas y seguras.
+- **Observabilidad** — habilita registro, instrumentación y métricas *técnicas y empresariales* para saber qué sucede dentro de tu arquitectura.
+- **Todo como código** — en AWS podés ver como código la carga de trabajo completa: aplicaciones, infraestructura, políticas, gobernanza y operaciones.
+
+Si definís y actualizás cada parte de la carga de trabajo mediante código, aplicás **la misma disciplina de ingeniería** del código de aplicación a toda la pila. Implementar las operaciones como código maximiza la productividad, minimiza las tasas de error y permite configurar respuestas automatizadas.
+
+## Pilar 2 — Seguridad
+
+**Pregunta:** *¿Protejo la información, los sistemas y los activos?*
+
+**Qué aborda:** la capacidad de proteger la información, los sistemas y los activos mientras se entrega valor empresarial, mediante evaluaciones de riesgo y estrategias de mitigación.
+
+La postura de seguridad es más sólida si aplicás estos cinco principios:
+
+- **Implementar una base de identidad sólida.**
+- **Usar y mantener la trazabilidad.**
+- **Aplicar seguridad en todas las capas.**
+- **Automatizar las prácticas recomendadas de seguridad.**
+- **Proteger los datos en tránsito y en reposo.**
+
+Aplicarlos no solo previene incidentes: también te prepara para responder cuando ocurra un evento de seguridad.
+
+## Pilar 3 — Fiabilidad
+
+**Pregunta:** *¿Se recupera el sistema de fallas y se adapta a la demanda?*
+
+**Qué aborda:** la capacidad de un sistema para recuperarse de errores de infraestructura o interrupciones de servicio, y de adquirir recursos de cómputo de forma dinámica para satisfacer la demanda. También mitigar interrupciones por errores de configuración o problemas transitorios de red.
+
+Por qué es difícil en un entorno tradicional: **puntos únicos de error**, **falta de automatización** y **falta de elasticidad**. Esos tres problemas son la raíz de casi toda caída evitable.
+
+Aplicar las prácticas de este pilar te da una arquitectura adecuada en cuanto a alta disponibilidad, tolerancia a errores y redundancia general.
+
+## Pilar 4 — Eficacia del rendimiento
+
+**Pregunta:** *¿Uso los recursos de forma eficiente y lo mantengo al cambiar la demanda?*
+
+**Qué aborda:** maximizar el rendimiento usando los recursos de computación de forma eficiente, y mantener esa eficiencia a medida que cambia la demanda. Dos principios a aplicar:
+
+- **Democratizar las tecnologías avanzadas** — si te resulta difícil implementar una tecnología vos mismo, considerá recurrir a un proveedor. Él asume la complejidad y el conocimiento, liberando a tu equipo para trabajo de más valor agregado.
+- **Compatibilidad mecánica** (*mechanical sympathy*) — usar una herramienta o sistema **conociendo cómo funciona mejor**. Elegí el enfoque tecnológico que se adapte a lo que intentás lograr. Por ejemplo, tené en cuenta los patrones de acceso a los datos al seleccionar el enfoque de base de datos o de almacenamiento.
+
+Compatibilidad mecánica es el término que más se pregunta de este pilar. Pensá en un piloto que conoce su motor: no basta con usar la herramienta, hay que usarla como fue diseñada para trabajar.
+
+## Pilar 5 — Optimización de costos
+
+**Pregunta:** *¿Evito gastos innecesarios?*
+
+**Qué aborda:** evitar gastos innecesarios. No es una tarea puntual: es un requisito permanente e iterativo que se perfecciona a lo largo de todo el ciclo de vida de producción.
+
+Las palancas concretas son tres:
+
+- **Comprender qué tan eficiente es tu arquitectura actual** frente a tus objetivos: ahí aparecen los gastos innecesarios.
+- **Adoptar el modelo de consumo adecuado** para tu caso práctico; normalmente, pagar solo por los recursos que utilizás.
+- **Considerar servicios administrados**: operan a escala de la nube y suelen ofrecer un menor costo por transacción o servicio.
+
+## Pilar 6 — Sostenibilidad
+
+**Pregunta:** *¿Maximizo la eficiencia y reduzco el desperdicio y el impacto ambiental?*
+
+**Qué aborda:** crear arquitecturas que maximicen la eficiencia y reduzcan el desperdicio. La disciplina de sostenibilidad considera el impacto **ambiental, económico y social a largo plazo** de las actividades empresariales. Debés comprender el impacto de tus cargas de trabajo y trabajar para reducirlo.
+
+Es un esfuerzo continuo, centrado en la reducción y eficiencia energéticas de todos los componentes: obtener el máximo beneficio de los recursos aprovisionados y minimizar los recursos totales requeridos.
+
+Cómo se logra en la práctica:
+
+- Seleccionar desde el inicio un **lenguaje de programación eficiente**.
+- Adoptar **algoritmos modernos**.
+- Usar **técnicas eficientes de almacenamiento de datos**.
+- Implementar infraestructura de cómputo **eficiente y del tamaño correcto** (*right-sizing*).
+- Minimizar los requisitos de **hardware de usuario final** de alta potencia.
+
+Atención: sostenibilidad es el **pilar más reciente** del Marco; los otros cinco son los originales. Por eso la Herramienta que describe este módulo formula preguntas sobre los cinco primeros pilares.
+
+## Una tabla rápida para comparar
+
+| Pilar | Pregunta que responde | Foco de aplicación |
+| --- | --- | --- |
+| Excelencia operativa | ¿Ejecutar, observar y mejorar? | IaC, observabilidad, calidad |
+| Seguridad | ¿Proteger información, sistemas y activos? | Identidad, trazabilidad, capas |
+| Fiabilidad | ¿Recuperarse de fallas y adaptarse a la demanda? | Multi-AZ, automatización, elasticidad |
+| Eficacia del rendimiento | ¿Usar los recursos de forma eficiente? | Tecnología adecuada, compatibilidad mecánica |
+| Optimización de costos | ¿Evitar gastos innecesarios? | Dimensionar, apagar, elegir modelo de consumo |
+| Sostenibilidad | ¿Maximizar eficiencia y reducir impacto? | Right-sizing, algoritmos y almacenamiento eficientes |
+
+La tabla no es para memorizar como imagen. Es para que cuando un ejercicio pregunte "¿qué pilar cubre X?", ya tengas la columna derecha mapeada al concepto.
+
+## La Herramienta AWS Well-Architected — pieza a pieza
+
+La Herramienta en la consola es un servicio **de autoservicio** que da acceso bajo demanda a las prácticas recomendadas actuales de AWS para crear infraestructura segura, de alto rendimiento, resiliente y eficiente.
+
+**Cómo funciona:** definís tu carga de trabajo y respondés una serie de preguntas en las áreas de **excelencia operativa, seguridad, fiabilidad, eficiencia del rendimiento y optimización de costos**. La herramienta compara tu carga de trabajo con las prácticas más recientes de AWS y devuelve un **plan de acción paso a paso**.
+
+Lo que te permite obtener:
+
+- Minimizar los errores del sistema y los costos operativos.
+- Profundizar en los procesos empresariales y de infraestructura.
+- Recibir guía sobre las prácticas recomendadas.
+- Cumplir con la propuesta de valor de la computación en la nube.
+
+Los resultados sirven para identificar los próximos pasos de mejora, impulsar decisiones de arquitectura e **integrar las consideraciones de arquitectura al proceso de gobernanza corporativa**.
+
+## Ventajas y desventajas como disciplina
+
+Al diseñar una solución, hay que pensar detenidamente las **ventajas y desventajas** para seleccionar un enfoque óptimo. **Siempre estás intercambiando una cosa por otra.**
+
+| A cambio de... | Renunciás a... |
+| --- | --- |
+| Mejor rendimiento (pilar 4) | Costo más alto (pilar 5) |
+| Mayor disponibilidad (pilar 3) | Mayor complejidad operativa (pilar 1) |
+| Más automatización (pilar 1) | Tiempo inicial mayor para diseñar la automatización |
+| Servicios administrados (pilar 5) | Menor control fino sobre la implementación |
+
+Pensar en *trade-offs* no es "elegir lo bueno": es **identificar qué perdés al elegir una cosa**, y verificar que el costo de ese sacrificio es aceptable para el requisito empresarial.

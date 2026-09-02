@@ -1,0 +1,112 @@
+---
+titulo: Bordes y trampas — lo que el Marco no te resuelve solo
+---
+
+Este nivel junta las trampas que el Marco tiene cuando se lo lee con superficialidad, **independientemente de los servicios que se elijan**. Cada una se responde con un cambio de hábito, no de herramienta.
+
+## Trampa 1 — Confundir el Marco con un *compliance check*
+
+La Herramienta de AWS Well-Architected se llena, el equipo recibe una lista de "alto riesgo", se marca cada ítem como completado — y nadie cambia nada de fondo. Esto pasa porque se trata a la Herramienta como auditoría de cumplimiento, cuando en realidad es **memoria institucional** de decisiones.
+
+El test es simple: si respondiendo "no alto riesgo" en una pregunta, no cambiás ningún runbook, dashboard ni pipeline real, la respuesta fue cosmética. El Marco sirve cuando la respuesta produce **un cambio medible en el sistema**: una alarma que ahora se dispara, un *tag* que ahora se aplica, una práctica de IaC que ahora se corre en CI.
+
+| Foco equivocado | Foco correcto |
+| --- | --- |
+| Llenar la herramienta para tener 0 riesgos | Llenarla para detectar puntos ciegos |
+| Tratar cada pregunta como checklist | Tratar cada pregunta como conversación del equipo |
+| Cerrar una pregunta al volver al código | Cerrarla al desplegar el cambio en el sistema |
+
+## Trampa 2 — Memorizar los seis pilares en vez de la mnemotecnia
+
+*Operar seguro y fiable, rápido, barato y verde.* Si intentás recordar "Excelencia operativa, Seguridad, Fiabilidad, Eficacia, Optimización, Sostenibilidad" letra por letra, perdés el orden. Si recordás la línea corta y la expandís al vuelo, ganás el orden y el nombre a la vez. Si cuando un ejercicio menciona "capa de defensa" no recordás automáticamente que es Seguridad (por contraste con Eficacia que sería "rendimiento"), memorizaste los nombres sueltos, no los conceptos.
+
+Cómo revertirlo: usá la mnemotecnia como atajo mental durante una semana hasta que aparezca sola.
+
+## Trampa 3 — Confundir compatibilidad mecánica con saber usar la herramienta
+
+*Mechanical sympathy* es el término más preguntado del pilar de Eficacia del rendimiento y por eso suele ser trampa: parece significar "manejar bien la herramienta". No. Significa **elegir la herramienta que mejor se adapta al patrón de acceso del problema**. Si tenés objetos grandes con lectura ocasional, S3. Si tenés consultas SQL con joins sobre millones de filas, una base de datos relacional. Si tenés millones de puntos con lectura por clave, una clave-valor. "Yo conozco SQL" no es compatibilidad mecánica — *elegir SQL aunque la carga pide clave-valor* tampoco lo es.
+
+| Trampa | Verdadera compatibilidad mecánica |
+| --- | --- |
+| "Uso RDS porque conozco SQL" | "Comparo RDS, DynamoDB y Redshift según acceso y decido" |
+| "Si es data, va a una relacional" | "Primero caracterizo: lectura/escritura, latencia, tamaño de objeto" |
+| "Lo importante es saber usar la herramienta" | "Lo importante es saber si la herramienta es la correcta" |
+
+## Trampa 4 — Creer que el antipatrón de escalado reactivo es exageración
+
+La trampa es leer el ejemplo del módulo ("los servidores llegan al 100 %, un admin lanza instancias a mano, la instancia tarda varios minutos en estar lista") como anécdota. **No lo es.** Hay arquitecturas reales funcionando hoy así, y se caen justo durante los picos. El detalle clave no es el número de servidores sino el **tiempo de respuesta del sistema completo**: varios minutos entre detección y disponibilidad es, en términos relativos, una eternidad para una API con cola esperando.
+
+Lo opuesto — detección por métricas personalizadas de aplicación y lanzamiento por *launch template* — es lo que sale del Pilar 1 + Pilar 3 cuando se trabaja junto, no separado.
+
+## Trampa 5 — Tratar instancias como mascotas
+
+"Ganado, no mascotas" suena simpática pero la tentación real es fuerte: cuando una instancia se comporta mal, los administradores de sistemas están entrenados para *"arreglarla"*. En la nube esto no escala porque **el problema viene muchas veces del estado interno** que se fue acumulando: paquetes instalados a mano, archivos descargados, configuración por SSH. Lo correcto es reemplazar idénticamente por una instancia nueva provisionada desde la plantilla. Cada vez que arreglás una instancia, perdiste el modelo de IaC.
+
+Regla corta: si una instancia tiene nombre propio, tenés una mascota. Si es reemplazable por una copia idéntica, tenés ganado.
+
+## Trampa 6 — Asumir que IaC resuelve todo
+
+IaC tiene tres beneficios documentados en el material: rapidez de duplicación, reducción de errores y propagación coherente de cambios. Lo que **no** hace solo:
+
+- No valida que la plantilla represente lo que debería. Si tu plantilla es incorrecta, todas las réplicas son incorrectas.
+- No detecta *drift* — instancias que se desvían de la plantilla por cambios manuales posteriores. Hace falta una herramienta de detección de *drift* además de la plantilla.
+- No audita cumplimiento de seguridad por sí mismo. Hace falta una capa de análisis estático (*cfn-nag*, *tflint*, *checkov*) que revise las plantillas antes de aplicar.
+
+| Rol de IaC | Lo que necesita un socio |
+| --- | --- |
+| Plantilla reproducible | CI/CD que la pruebe |
+| Cambios coherentes | Detección de drift |
+| Menos errores manuales | Análisis estático |
+
+## Trampa 7 — Pensar que "servicios, no servidores" significa "no usar EC2 nunca"
+
+La práctica dice "no limités tu infraestructura a servidores". Significa: cuando el caso lo justifique, elegí **servicios administrados** (colas, S3, Cognito, RDS, Lambda, EKS). Hay casos donde EC2 sigue siendo la respuesta correcta, sobre todo si necesitás un sistema operativo específico o una dependencia que ningún servicio administrado ofrece.
+
+La trampa opuesta también existe: usar Lambda para una tarea que tarda 30 minutos (el límite actual son 15 minutos) o para una carga que satura la CPU constantemente. La decisión se toma con datos: perfil de latencia, duración máxima, patrón de invocación.
+
+## Trampa 8 — Olvidar CloudFront porque "es solo caché"
+
+La práctica de caché no es cosmético: en una audiencia dispersa geográficamente, **la primera solicitud** desde un punto lejano cruza la región; **la segunda** se responde desde un nodo de periferia cercano. Para contenidos de lectura, esa pequeña diferencia cambia latencia y factura. La trampa es reducir la práctica a "CloudFront para contenido público" y no aplicarla cuando el contenido es privado pero estable.
+
+## Trampa 9 — Seguridad solo en el perímetro
+
+El pilar 2 enumera cinco principios. Si tu única defensa es un Security Group en el borde, tenés seguridad en una capa. El marco pide **defensa en profundidad**, con identidad en cada acceso (IAM + MFA), trazabilidad (CloudTrail + Config), cifrado (KMS en reposo + TLS en tránsito), capas aisladas (subredes privadas, VPC endpoints) y automatización (Security Hub + escaneo de imágenes).
+
+La regla para el curso: si enumerás una sola capa al defender una decisión de seguridad, no la justificaste.
+
+## Trampa 10 — Decidir sin datos
+
+El Marco tiene un principio implícito: **las decisiones se basan en datos empíricos**, no en intuición. Esto se nota en las justificaciones:
+
+- **Pruebas de carga** para confirmar un beneficio medible de rendimiento.
+- **Análisis comparativos** para converger hacia la carga de trabajo de menor costo.
+- **Métricas personalizadas** de aplicación además de CPU/memoria/red, porque las del sistema operativo no cuentan toda la historia.
+
+Decidir por corazonada suele terminar en sobredimensionar (caso clásico: elegir la instancia más grande por las dudas) o subdimensionar (caso opuesto, ahorrando en exceso en las fases tempranas).
+
+## Trampa 11 — Leer "Sostenibilidad" como "reciclar"
+
+El pilar 6 es el más reciente del Marco y, por eso, el menos intuitivo. La trampa es leerlo como "ser amable con el ambiente" cuando en realidad es **eficiencia energética aplicada a la arquitectura**: *right-sizing*, algoritmos eficientes, almacenamiento eficiente, lenguajes eficientes, reducción de requisitos de hardware de usuario final. Cada acción tiene un *trade-off* medible con costo, rendimiento y mantenibilidad. No es marketing.
+
+## Trampa 12 — Creer que el Marco se aplica solo en revisión
+
+La Herramienta es un momento, no un flujo. **El Marco se aplica en cada design review, en cada *post-mortem*, en cada decisión de dimensionamiento**. Si en tu equipo el Marco aparece únicamente "cuando alguien lo pide", sigue siendo un *compliance check* (trampa 1) disfrazado de cultura.
+
+## Cómo revertir las doce trampas a la vez
+
+| Trampa | Acción inversa | Pilar |
+| --- | --- | --- |
+| 1. Marco = checklist | Cambiar una práctica real por sprint | Excelencia operativa |
+| 2. Memorizar nombres | Usar mnemotecnia una semana | (método) |
+| 3. Confundir herramienta con elección | Tabla comparativa por carga | Eficacia |
+| 4. Subestimar escalado reactivo | Métricas + Auto Scaling obligatorio | Fiabilidad |
+| 5. Mascotas | Plantilla + Launch Template + Auto Scaling | Excelencia operativa |
+| 6. IaC como varita mágica | Drift detection + análisis estático | Excelencia operativa |
+| 7. Servicios como dogma | Caracterizar primero | Optimización de costos |
+| 8. Caché como decoración | CloudFront por audiencia dispersa | Eficacia |
+| 9. Una capa de defensa | Cinco principios activos | Seguridad |
+| 10. Decidir por corazonada | Una prueba de carga antes de comprar | Eficacia |
+| 11. Sostenibilidad como marketing | Right-sizing obligatorio | Sostenibilidad |
+| 12. Marco solo en revisión | Marco en cada design review | Excelencia operativa |
+
+La columna "Pilar" no es decorativa: cada acción inversa apunta al pilar que la justifica. Si te toca defender una mejora en un examen o laboratorio, esa asociación **una mejora → un pilar** es lo que cierra el argumento.

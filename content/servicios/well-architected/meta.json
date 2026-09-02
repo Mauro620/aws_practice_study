@@ -1,0 +1,40 @@
+{
+  "id": "well-architected",
+  "nombre": "Marco de AWS Well-Architected",
+  "categoria": "Curso",
+  "modulo": 2,
+  "prerequisitos": [],
+  "resumenUnaLinea": "Seis pilares para evaluar y mejorar una arquitectura en la nube, las prácticas de diseño que el curso desarrolla y las trampas más comunes al aplicarlas.",
+  "erroresFrecuentes": [
+    { "descripcion": "Memorizar los seis pilares como lista suelta: en realidad son cinco principios operativos (operar, asegurar, ser fiable, rendir, optimizar y aplicar WA) más sostenibilidad al final." },
+    { "descripcion": "Confundir escalabilidad con elasticidad: escalar es *agregar* capacidad; ser elástico es *agregarla y retirarla* según la demanda." },
+    { "descripcion": "Pensar que el antipatrón de 'escalado reactivo y manual' es una exageración: en AWS un lanzamiento de instancia a mano tarda varios minutos y la indisponibilidad se alarga durante ese intervalo." },
+    { "descripcion": "Creer que IaC es solo para producción: la mayor utilidad está en replicar entornos de dev/test/staging sin pasos manuales." },
+    { "descripcion": "Tratar instancias como 'mascotas' (curarlas cuando se rompen) en vez de 'ganado' (reemplazarlas idénticamente por una nueva): rompe la tolerancia a fallos." },
+    { "descripcion": "Elegir base de datos por familiaridad en vez de por patrón de acceso: relacional sirve para la mayoría, pero hay cargas donde un NoSQL o un warehouse es objetivamente mejor." },
+    { "descripcion": "Diseñar con un servidor que 'no debería caerse' como única fuente de datos sin réplica: es un punto único de error garantizado." },
+    { "descripcion": "Olvidar CloudFront para contenidos de lectura con audiencia dispersa: añade caché barato que mejora latencia y baja la factura del origen." },
+    { "descripcion": "Aplicar seguridad solo en el perímetro: la profundidad es por capas (red, instancia, aplicación, dato), no solo en el borde." },
+    { "descripcion": "Decidir por intuición sin datos: las pruebas de carga y los análisis comparativos convergen hacia la carga de trabajo de menor costo con beneficio medible." }
+  ],
+  "glosario": [
+    { "termino": "Marco de AWS Well-Architected", "definicion": "Guía de AWS con preguntas y prácticas recomendadas para evaluar y mejorar arquitecturas de nube; seis pilares." },
+    { "termino": "Excelencia operativa", "definicion": "Pilar 1: ejecutar, observar y mejorar el sistema de forma continua (IaC, observabilidad, ingeniería de calidad)." },
+    { "termino": "Seguridad", "definicion": "Pilar 2: proteger información, sistemas y activos mediante identidad fuerte, trazabilidad, capas, automatización y cifrado." },
+    { "termino": "Fiabilidad", "definicion": "Pilar 3: capacidad de recuperarse de fallas de infraestructura y adaptarse a la demanda, con tolerancia a errores transitorios." },
+    { "termino": "Eficacia del rendimiento", "definicion": "Pilar 4: usar los recursos de forma eficiente al cambiar la demanda; compatibilidad mecánica, monitorizar y elegir el enfoque adecuado." },
+    { "termino": "Optimización de costos", "definicion": "Pilar 5: evitar gastos innecesarios dimensionando, apagando lo no usado y eligiendo el modelo de compra correcto." },
+    { "termino": "Sostenibilidad", "definicion": "Pilar 6: maximizar la eficiencia y reducir el desperdicio y el impacto ambiental de la carga de trabajo en la nube." },
+    { "termino": "Herramienta AWS Well-Architected", "definicion": "Servicio en la consola para revisar cargas de trabajo contra los seis pilares y registrar mejoras." },
+    { "termino": "Compatibilidad mecánica", "definicion": "Usar una tecnología con conocimiento de sus puntos fuertes, eligiendo el enfoque adecuado al objetivo (ej. motor de base de datos según patrón de acceso)." },
+    { "termino": "Infraestructura como código (IaC)", "definicion": "Aprovisionar la infraestructura mediante plantillas en código en lugar de procesos manuales; sus tres beneficios: rapidez, menos errores, propagación coherente." },
+    { "termino": "Recursos desechables", "definicion": "Tratar la infraestructura como software, no como hardware; aprovisionar bajo demanda, detener lo no usado, reemplazar idénticamente." },
+    { "termino": "Ganado, no mascotas", "definicion": "Mnemotecnia para recursos desechables: a una mascota se la cura, a un servidor ganadero se lo reemplaza por otro idéntico." },
+    { "termino": "Acoplamiento débil", "definicion": "Diseñar componentes que se comunican por interfaces estables (ELB, colas) en vez de por direcciones internas, para evitar fallos en cascada." },
+    { "termino": "Servicios, no servidores", "definicion": "Cuando la carga lo justifique, elegir servicios administrados de AWS (colas, S3, Cognito, RDS) en lugar de mantener software de infraestructura propio." },
+    { "termino": "Punto único de fallo", "definicion": "Cualquier componente del que depende el servicio y que, al fallar, hace caer todo; la forma de evitarlo es replicar y diseñar para falla." },
+    { "termino": "Amazon CloudWatch", "definicion": "Servicio de monitorización y métricas; emite alarmas que disparan Auto Scaling y acciones automatizadas." },
+    { "termino": "Amazon EC2 Auto Scaling", "definicion": "Servicio que lanza o termina instancias automáticamente según alarmas y políticas configuradas." }
+  ],
+  "preguntas": []
+}
