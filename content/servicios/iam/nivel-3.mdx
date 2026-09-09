@@ -1,0 +1,52 @@
+---
+titulo: Beto y el bucket — dos políticas discutiendo
+---
+
+El caso mínimo del nivel anterior tenía una sola política. El caso realista casi siempre tiene dos: una **política de identidad** (adjunta a Beto) y una **política de recurso** (adjunta al bucket). Cuando las dos existen, AWS las combina — y esa combinación es la parte del módulo que más se pregunta en examen.
+
+## El vocabulario que hace falta para leer los ejemplos
+
+| Término | Se adjunta a | Responde |
+| --- | --- | --- |
+| **Política basada en identidad** | Usuario, grupo o rol | ¿Qué puede hacer *esta identidad*? |
+| **Política basada en recursos** | El recurso mismo (bucket, cola, tabla) | ¿Quién puede hacer qué *sobre este recurso*? |
+
+En una política de identidad, `Resource` es obligatorio y `Principal` no se incluye — está implícito, es la identidad dueña de la política. En una política de recurso es al revés: `Principal` es obligatorio (dice a quién aplica) y `Resource` es opcional.
+
+## Ejemplo A — el bucket gana con un Deny
+
+Beto tiene una política de identidad que le permite `GET`, `LIST` y `PUT` sobre el bucket X. El bucket X, por su parte, tiene su propia política:
+
+| Acción | Política de identidad (Beto) | Política del bucket X | Resultado |
+| --- | --- | --- | --- |
+| GET | Allow | Allow | ✅ Permitido |
+| LIST | Allow | Allow | ✅ Permitido |
+| PUT | **Allow** | **Deny** | ❌ **Denegado** |
+
+Aunque Beto tiene permiso explícito para subir objetos, el bucket lo deniega explícitamente. Alcanza con memorizar una frase: **el `Deny` gana siempre**, sin importar en cuál de las dos políticas aparezca.
+
+## Ejemplo B — basta con que una de las dos permita
+
+Ahora Beto opera sobre el bucket Y, cuya política de recurso sí lo menciona en `GET` pero la de identidad de Beto no dice nada al respecto:
+
+| Acción | Política de identidad (Beto) | Política del bucket Y | Resultado |
+| --- | --- | --- | --- |
+| GET | N/A | **Allow** | ✅ **Permitido** |
+| LIST | Allow | Allow | ✅ Permitido |
+| PUT | N/A | N/A | ❌ Denegado (implícita) |
+
+La política de identidad de Beto no menciona `GET`, pero la del bucket sí lo permite: Beto puede leer. Nadie menciona `PUT`: aplica la denegación implícita, la regla por defecto de todo el servicio.
+
+> **La regla que resume ambos ejemplos, dentro de una misma cuenta:** un `Allow` en cualquiera de las dos políticas alcanza para permitir. Un `Deny` en cualquiera de las dos alcanza para bloquear.
+
+## El caso realista con roles: tres escenarios del curso
+
+| Situación | Por qué el rol es la respuesta |
+| --- | --- |
+| Un usuario de la Cuenta 1 necesita acceder a un recurso de la Cuenta 2 | Evita crear un usuario duplicado en la segunda cuenta |
+| Usuarios federados por un sistema externo (Active Directory, SSO corporativo) | No se crean usuarios de IAM para gente ajena a la organización |
+| Una app en EC2 necesita leer un bucket de S3 | Evita guardar credenciales de larga duración en la instancia (visto en el nivel anterior) |
+
+El patrón se repite siempre igual: **crear la política, crear el rol y adjuntarla, y que alguien (o algo) asuma el rol.** Al asumirlo, los permisos anteriores del que lo asume se olvidan temporalmente y AWS emite credenciales de seguridad válidas solo para esa sesión.
+
+Herramienta de apoyo para depurar todo esto sin arriesgar producción: el **simulador de políticas de IAM**, que permite probar el resultado de una política antes de aplicarla.

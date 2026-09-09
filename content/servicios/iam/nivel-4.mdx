@@ -1,0 +1,68 @@
+---
+titulo: Las tres reglas, el NotResource blindado y la pregunta de examen
+---
+
+Todo lo anterior es la superficie. La mecánica exacta que AWS ejecuta en cada solicitud son **tres reglas y un orden fijo** — y son la parte del módulo donde más se pierden puntos por atajos mentales.
+
+## Las tres reglas, sin atajos
+
+```
+1. Por defecto, TODAS las solicitudes se deniegan.        → denegación implícita
+2. Un Allow explícito anula la denegación por defecto.
+3. Un Deny explícito anula CUALQUIER Allow explícito.
+```
+
+```
+                    ¿Hay un Deny explícito?
+                       │            │
+                      SÍ            NO
+                       │            │
+                   DENEGAR    ¿Hay un Allow explícito?
+                                 │            │
+                                SÍ            NO
+                                 │            │
+                             PERMITIR    DENEGAR (implícita)
+```
+
+Dos puntos que el examen pregunta directo:
+
+- **El orden de evaluación no altera el resultado.** AWS evalúa todas las políticas aplicables antes de decidir; no importa si el `Deny` está en el primer enunciado o en el último.
+- **La denegación implícita se revierte con un `Allow` en cualquier política aplicable. La explícita, no la revierte nada.**
+
+## El límite duro: Allow + Deny sobre NotResource
+
+Hay un patrón que combina las dos reglas para crear un límite que ninguna otra política puede ensanchar. Usa el elemento `NotResource`, que significa "todo lo que **no** sea esto":
+
+```
+Allow  → acciones sobre una tabla concreta de DynamoDB
+Deny   → cualquier acción de DynamoDB sobre NotResource:
+         es decir, sobre todo lo que no sea esa tabla
+```
+
+El resultado: el usuario opera sobre la tabla listada y sobre nada más — **aunque otra política, escrita por otra persona, le conceda permisos adicionales sobre otras tablas.** Como el `Deny` explícito siempre gana, ese permiso adicional nunca alcanza a aplicarse. Es la forma correcta de poner un piso de seguridad cuando no controlás todas las políticas que podrían terminar aplicando sobre un usuario.
+
+Podés armar exactamente este escenario en el **evaluador de políticas IAM** de las herramientas del curso: cargá el `Allow` sobre el recurso concreto, el `Deny` con `NotResource` marcado, y probá pedir acceso a un recurso distinto.
+
+## El acceso entre cuentas necesita las dos mitades
+
+Una política de bucket de la Cuenta A puede conceder a la Cuenta B, identificada por su número de cuenta, permiso para operar sobre ese bucket. Pero esa política **no menciona usuarios, grupos ni roles concretos** — solo la cuenta.
+
+> Para que un usuario específico de la Cuenta B use ese acceso, la Cuenta B tiene que además concederle el permiso con su propia política de identidad. La cuenta dueña del recurso abre la puerta; la cuenta del usuario le da permiso de cruzarla. Con una sola no alcanza.
+
+## La pregunta de examen resuelta
+
+**Escenario:** un equipo de desarrolladores necesita acceso a ciertos recursos durante un período determinado.
+
+| Opción | Veredicto |
+| --- | --- |
+| Un único usuario compartido para el equipo | ❌ Se pierde la responsabilidad individual: nadie sabe quién hizo qué |
+| Un usuario por desarrollador, política adjunta a cada uno | ⚠️ Funciona, pero cada alta o baja obliga a editar políticas una por una |
+| Un usuario por desarrollador, agrupados, política adjunta al grupo | ✅ Correcta: se aplica automáticamente a quien se agregue y se retira automáticamente a quien se elimine |
+
+**La regla generalizable:** *equipo, conjunto de personas, rol organizacional* → la respuesta casi siempre es un **grupo**. *Acceso temporal, aplicaciones, servicios, cuentas externas* → la respuesta es un **rol**. Y cualquier opción que proponga **compartir credenciales** es incorrecta por definición, sin excepciones.
+
+## Cómo conecta con el resto del curso
+
+- **Con EC2:** el perfil de instancia y el rol son la alternativa correcta a guardar claves en el servidor — el error más grave señalado en el módulo de EC2.
+- **Con VPC:** IAM controla quién puede llamar a la API; los Security Groups y las NACL controlan qué tráfico circula por la red. Son capas distintas de la misma defensa en profundidad, no se sustituyen entre sí.
+- **Con el Well-Architected Framework:** todo este módulo desarrolla los dos primeros principios de diseño del pilar de seguridad — identidad sólida y mínimo privilegio.

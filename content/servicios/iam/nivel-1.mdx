@@ -1,0 +1,37 @@
+---
+titulo: El banco, la llave maestra y la libreta de permisos
+---
+
+Sos cliente de un banco y querés pagar una factura en línea. Antes de dejarte entrar, el banco necesita comprobar que sos vos: usuario, contraseña y, si tenés MFA activado, un código enviado a tu teléfono. Eso es **autenticación**: responde *quién sos*.
+
+Ya adentro, ¿podés pagar tu factura con el dinero de otro cliente? No. Estás autenticado, pero no autorizado a tocar cuentas ajenas — sí a operar sobre la tuya. Eso es **autorización**: responde *qué podés hacer*.
+
+**La lección que sostiene todo el módulo:** autenticarse no implica poder hacerlo todo. Son dos controles independientes y ambos tienen que cumplirse.
+
+## AWS IAM es el banco entero
+
+IAM (Identity and Access Management) es el servicio que implementa las dos preguntas sobre los recursos de AWS. Y arranca desde el lado más estricto posible:
+
+> **Es seguro por defecto.** Una identidad nueva no tiene ningún permiso hasta que se le concede explícitamente. No hay que quitar accesos: hay que darlos.
+
+Pensalo como una libreta en blanco. Cada usuario, grupo o rol que creás llega sin ninguna página escrita. Vos decidís qué entra en esa libreta — y esa decisión es una política.
+
+## El usuario raíz es la llave maestra de la casa
+
+Cuando abrís una cuenta de AWS, la primera identidad que existe tiene acceso total e irrestricto a todo. Es el **usuario raíz**, y la regla es simple: tratá sus credenciales como tratarías el número de tu tarjeta de crédito.
+
+Nadie usa la llave maestra de la casa para entrar a su propio cuarto todos los días. Se activa MFA en esa llave, se guarda, y se crea una llave normal (un usuario administrador) para el uso diario. La llave maestra solo sale cuando hace falta algo que ninguna otra llave puede hacer.
+
+## Tres formas de organizar identidades
+
+| Objeto | Analogía | Credenciales |
+| --- | --- | --- |
+| **Usuario** | Una persona con su propia llave | Permanentes, hay que rotarlas |
+| **Grupo** | Un llavero con la misma llave copiada para todo el equipo | No tiene credenciales propias |
+| **Rol** | Una llave de hotel que se reprograma cada vez que alguien la pide, y que caduca sola | Temporales, se emiten al asumirlo |
+
+El rol es la pieza que menos se parece a algo cotidiano y la más importante del módulo: no es de nadie hasta que alguien lo pide prestado, y cuando lo devuelve, deja de servir. Por eso es la opción preferida cada vez que es viable — nadie tiene que acordarse de rotarle la cerradura.
+
+## Lo que viene
+
+Con esta base — autenticación vs. autorización, seguro por defecto, usuario/grupo/rol — el resto del módulo es mecánica: cómo se escribe una política, cómo decide AWS entre varias políticas que dicen cosas distintas, y por qué esa decisión sigue siempre las mismas tres reglas.

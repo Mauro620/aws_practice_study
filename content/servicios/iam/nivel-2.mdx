@@ -1,0 +1,62 @@
+---
+titulo: El primer día de una cuenta nueva
+---
+
+El caso mínimo de IAM no es una política compleja: es la secuencia de seis pasos que todo curso de AWS repite, porque es la que separa una cuenta bien arrancada de una cuenta que un día se lamenta.
+
+## Los seis pasos del primer día
+
+```
+1. Iniciás sesión como usuario raíz.
+2. Activás MFA en el usuario raíz.
+3. Creás un usuario administrador, le activás MFA y descargás sus claves programáticas.
+4. Cerrás sesión como usuario raíz.
+5. Iniciás sesión como el usuario administrador.
+6. Desde ahí, creás el resto de las cuentas de usuario.
+```
+
+A partir del paso 4, el usuario raíz solo vuelve a usarse para lo que ningún otro usuario puede hacer: cambiar el plan de soporte, cerrar la cuenta, modificar la facturación.
+
+## El caso mínimo de organización: un grupo, una política
+
+Supongamos que tres personas del equipo de ventas necesitan leer reportes en un bucket de S3. La forma correcta, incluso en el caso más chico, ya usa un grupo:
+
+```
+Política "LecturaReportesVentas"  ──adjunta a──►  Grupo Ventas
+                                                     ├── Usuario ana
+                                                     ├── Usuario bruno
+                                                     └── Usuario cora
+```
+
+Un documento de política mínimo tiene cuatro piezas:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:ListBucket"],
+      "Resource": ["arn:aws:s3:::reportes-ventas/*"]
+    }
+  ]
+}
+```
+
+- **`Effect`**: `Allow` o `Deny`.
+- **`Action`**: qué se permite (o deniega). Acepta comodines: `s3:Get*` cubre todas las acciones de lectura que empiezan así.
+- **`Resource`**: sobre qué recursos aplica. Obligatorio en política de identidad.
+- **`Statement`**: el contenedor. Puede tener varios enunciados, y entre ellos AWS aplica un OR lógico.
+
+Ningún integrante nuevo del equipo necesita una política propia: se lo agrega al grupo y hereda el acceso completo. Cuando alguien sale del equipo, se lo saca del grupo y pierde el acceso de inmediato. Ese es el caso mínimo funcionando como se espera.
+
+## El caso mínimo de un rol: EC2 accede a S3 sin claves
+
+El otro caso mínimo que vale la pena fijar temprano: una aplicación corriendo en una instancia EC2 necesita leer un bucket. La respuesta nunca es guardar una clave de acceso en la instancia.
+
+```
+Crear rol con los permisos → agregar el rol a un PERFIL DE INSTANCIA
+→ adjuntar el perfil a la instancia → la aplicación accede al bucket
+```
+
+El **perfil de instancia** es el contenedor que asocia el rol a la instancia. La aplicación pide credenciales, AWS las emite temporales, y esas credenciales rotan solas sin que nadie las toque. Es el caso mínimo de "nunca guardes una clave donde alguien la pueda leer".

@@ -13,6 +13,7 @@ export const COURSE_MODULES: { category: string; modules: CourseModule[] }[] = [
     modules: [
       { id: 'bienvenida', label: 'M1 Le damos la bienvenida a AWS Academy Cloud Architecting' },
       { id: 'well-architected', label: 'M2 Marco de AWS Well-Architected' },
+      { id: 'iam', label: 'M3 Protección del acceso (AWS IAM)' },
     ],
   },
   {
@@ -40,6 +41,7 @@ export const LAB_GROUPS: { label: string; items: Lab[] }[] = [
     items: [
       { href: '/herramientas/ec2', label: 'Explorador de tipos de instancia EC2' },
       { href: '/herramientas/sg-nacl', label: 'Verificador SG vs NACL' },
+      { href: '/herramientas/iam', label: 'Evaluador de políticas IAM' },
     ],
   },
   {

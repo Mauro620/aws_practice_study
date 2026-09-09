@@ -1,0 +1,42 @@
+{
+  "id": "iam",
+  "nombre": "Protección del acceso (AWS IAM)",
+  "categoria": "Seguridad",
+  "modulo": 3,
+  "prerequisitos": ["well-architected"],
+  "resumenUnaLinea": "IAM controla quién puede hacer qué sobre los recursos de AWS: usuarios, grupos, roles y las políticas JSON que deciden, por reglas fijas, si una solicitud se permite o se deniega.",
+  "erroresFrecuentes": [
+    { "descripcion": "Usar el usuario raíz para el trabajo diario: tiene acceso total e irrestricto, así que un error o una filtración compromete toda la cuenta." },
+    { "descripcion": "No activar MFA en el usuario raíz: una contraseña filtrada basta para tomar la cuenta completa." },
+    { "descripcion": "Compartir un usuario entre varias personas: se pierde la trazabilidad individual y no se puede revocar el acceso de una sola persona." },
+    { "descripcion": "Adjuntar políticas usuario por usuario en lugar de a grupos: inmanejable en cuanto el equipo crece o rota." },
+    { "descripcion": "Guardar claves de acceso en el código o en una instancia EC2: usa un rol y un perfil de instancia en su lugar." },
+    { "descripcion": "Empezar con permisos amplios pensando en restringir después: nunca se restringe, porque nadie sabe qué está realmente en uso." },
+    { "descripcion": "Crear usuarios de IAM para personas ajenas a la organización: para eso existe la federación y los roles." },
+    { "descripcion": "Confundir denegación implícita con explícita: la implícita se revierte con un Allow; la explícita, nunca." },
+    { "descripcion": "Suponer que una política de identidad basta para el acceso entre cuentas: hacen falta las dos, la del recurso y la de la identidad." },
+    { "descripcion": "Creer que el orden de los enunciados de una política cambia el resultado: no lo cambia, AWS evalúa todos." }
+  ],
+  "glosario": [
+    { "termino": "IAM", "definicion": "Servicio de AWS, global y sin costo adicional, para controlar quién puede hacer qué sobre los recursos." },
+    { "termino": "Autenticación", "definicion": "Verificar quién es el solicitante (usuario y contraseña, MFA, clave de acceso)." },
+    { "termino": "Autorización", "definicion": "Determinar qué puede hacer el solicitante ya autenticado, mediante políticas de IAM." },
+    { "termino": "Usuario raíz", "definicion": "Identidad inicial de la cuenta, con acceso total e irrestricto. Se usa solo para tareas que ningún otro usuario puede hacer." },
+    { "termino": "Usuario de IAM", "definicion": "Entidad que representa a una persona o aplicación, con credenciales permanentes que hay que rotar." },
+    { "termino": "Grupo de IAM", "definicion": "Conjunto de usuarios que comparten permisos. Es identidad pero no entidad: no se autentica." },
+    { "termino": "Rol de IAM", "definicion": "Identidad con permisos que se asume temporalmente. No tiene credenciales propias; AWS emite credenciales temporales al asumirlo." },
+    { "termino": "Perfil de instancia", "definicion": "Contenedor que asocia un rol de IAM a una instancia EC2." },
+    { "termino": "Política de IAM", "definicion": "Documento JSON que enumera permisos de forma explícita, con Effect, Action, Resource y opcionalmente Condition." },
+    { "termino": "Política basada en identidad", "definicion": "Se adjunta a un usuario, grupo o rol; dice qué puede hacer esa identidad. Resource es obligatorio, Principal no aplica." },
+    { "termino": "Política basada en recursos", "definicion": "Se adjunta al recurso mismo; dice quién puede hacer qué sobre él. Principal es obligatorio." },
+    { "termino": "Denegación implícita", "definicion": "Ausencia de permiso: nada la menciona. Se revierte con un Allow explícito en cualquier política aplicable." },
+    { "termino": "Denegación explícita", "definicion": "Effect: Deny en una política. Ningún Allow la anula, sin importar dónde aparezca." },
+    { "termino": "Mínimo privilegio", "definicion": "Conceder solo los permisos necesarios para una tarea concreta; empezar restrictivo y ampliar, nunca al revés." },
+    { "termino": "Federación", "definicion": "Usar un sistema de identidad externo (Active Directory, proveedores estándar) para acceder a AWS sin crear un usuario de IAM." },
+    { "termino": "IAM Identity Center", "definicion": "Servicio de administración centralizada de accesos federados entre cuentas." },
+    { "termino": "CloudTrail", "definicion": "Registro de todas las acciones realizadas en la cuenta; base de la trazabilidad y de la vigilancia del usuario raíz." },
+    { "termino": "Clave de acceso", "definicion": "ID de clave más clave secreta, usada por CLI, SDK y llamadas directas a la API. No intercambiable con usuario y contraseña." },
+    { "termino": "Simulador de políticas de IAM", "definicion": "Herramienta de AWS para probar el efecto de una política antes de aplicarla." }
+  ],
+  "preguntas": []
+}

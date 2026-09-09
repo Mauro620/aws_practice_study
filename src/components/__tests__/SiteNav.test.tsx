@@ -14,6 +14,7 @@ vi.mock('next/navigation', () => ({
 const serviceNames = {
   bienvenida: 'Le damos la bienvenida a AWS Academy Cloud Architecting',
   'well-architected': 'Marco de AWS Well-Architected',
+  iam: 'Protección del acceso (AWS IAM)',
   vpc: 'Amazon VPC (Virtual Private Cloud)',
   ec2: 'Amazon EC2 (Elastic Compute Cloud)',
 }
