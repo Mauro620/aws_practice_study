@@ -1,14 +1,15 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
-import { COURSE_MODULES, LAB_GROUPS, SiteNav } from '../SiteNav'
+import { HERRAMIENTAS_TRANSVERSALES } from '@/lib/herramientas'
+import { COURSE_MODULES, SiteNav } from '../SiteNav'
 
 vi.mock('next/link', () => ({
   default: ({ href, children, ...props }: { href: string; children: ReactNode }) => <a href={href} {...props}>{children}</a>,
 }))
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/herramientas/cidr',
+  usePathname: () => '/guia-arquitectura',
 }))
 
 const serviceNames = {
@@ -45,51 +46,44 @@ describe('SiteNav', () => {
     }
   })
 
-  it('places the architecture guide in the transversal learning subsection', () => {
+  it('places the architecture guide and every transversal tool in the transversal subsection', () => {
     render(<SiteNav servicios={servicios} />)
 
     expect(screen.getAllByRole('heading', { name: 'Guía transversal', level: 2 })).toHaveLength(2)
     expect(screen.getAllByRole('link', { name: 'Guía de arquitectura AWS' })).toHaveLength(2)
     expect(screen.getAllByRole('link', { name: 'Guía de arquitectura AWS' }).every((link) => link.getAttribute('href') === '/guia-arquitectura')).toBe(true)
+
+    for (const herramienta of HERRAMIENTAS_TRANSVERSALES) {
+      const links = screen.getAllByRole('link', { name: herramienta.label })
+      expect(links).toHaveLength(2)
+      expect(links.every((link) => link.getAttribute('href') === herramienta.href)).toBe(true)
+    }
   })
 
-  it('groups every existing lab route under native collapsible subgroups', () => {
+  it('marks the active transversal route and leaves others inactive', () => {
     render(<SiteNav servicios={servicios} />)
 
-    const navs = screen.getAllByRole('navigation', { name: 'Laboratorios interactivos' })
-    expect(navs).toHaveLength(2)
-    for (const nav of navs) {
-      expect(within(nav).getAllByRole('group')).toHaveLength(3)
-      for (const { label, items } of LAB_GROUPS) {
-        const subgroup = within(nav).getByRole('group', { name: label })
-        expect(within(subgroup).getByText(label).tagName).toBe('SUMMARY')
-        for (const item of items) {
-          expect(within(subgroup).getByRole('link', { name: item.label })).toHaveAttribute('href', item.href)
-        }
+    for (const link of screen.getAllByRole('link', { name: 'Guía de arquitectura AWS' })) {
+      expect(link).toHaveAttribute('aria-current', 'page')
+    }
+    for (const herramienta of HERRAMIENTAS_TRANSVERSALES) {
+      for (const link of screen.getAllByRole('link', { name: herramienta.label })) {
+        expect(link).not.toHaveAttribute('aria-current')
       }
     }
   })
 
-  it('opens the active lab subgroup and marks only exact routes active', () => {
+  it('no longer renders a standing lab/tools group in the left nav', () => {
     render(<SiteNav servicios={servicios} />)
 
-    for (const link of screen.getAllByRole('link', { name: 'Calculadora de CIDR' })) {
-      expect(link).toHaveAttribute('aria-current', 'page')
-    }
-    for (const link of screen.getAllByRole('link', { name: 'Constructor visual de VPC' })) {
-      expect(link).not.toHaveAttribute('aria-current')
-    }
-    for (const nav of screen.getAllByRole('navigation', { name: 'Laboratorios interactivos' })) {
-      expect(within(nav).getByRole('group', { name: 'Red y conectividad' })).toHaveAttribute('open')
-      expect(within(nav).getByRole('group', { name: 'Cómputo y seguridad' })).not.toHaveAttribute('open')
-    }
+    expect(screen.queryAllByRole('navigation', { name: 'Laboratorios interactivos' })).toHaveLength(0)
+    expect(screen.queryAllByRole('link', { name: 'Calculadora de CIDR' })).toHaveLength(0)
   })
 
   it('keeps separate landmarks and a bounded sticky desktop sidebar', () => {
     render(<SiteNav servicios={servicios} />)
 
     expect(screen.getAllByRole('navigation', { name: 'Contenido de aprendizaje' })).toHaveLength(2)
-    expect(screen.getAllByRole('navigation', { name: 'Laboratorios interactivos' })).toHaveLength(2)
     expect(document.querySelector('aside')).toHaveClass('md:sticky', 'md:top-0', 'md:h-dvh', 'md:self-start', 'md:max-h-dvh', 'md:overflow-y-auto')
   })
 })

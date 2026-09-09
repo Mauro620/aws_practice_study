@@ -41,7 +41,7 @@ Deny   → cualquier acción de DynamoDB sobre NotResource:
 
 El resultado: el usuario opera sobre la tabla listada y sobre nada más — **aunque otra política, escrita por otra persona, le conceda permisos adicionales sobre otras tablas.** Como el `Deny` explícito siempre gana, ese permiso adicional nunca alcanza a aplicarse. Es la forma correcta de poner un piso de seguridad cuando no controlás todas las políticas que podrían terminar aplicando sobre un usuario.
 
-Podés armar exactamente este escenario en el **evaluador de políticas IAM** de las herramientas del curso: cargá el `Allow` sobre el recurso concreto, el `Deny` con `NotResource` marcado, y probá pedir acceso a un recurso distinto.
+Podés armar exactamente este escenario en el [evaluador de políticas IAM](/herramientas/iam): cargá el `Allow` sobre el recurso concreto, el `Deny` con `NotResource` marcado, y probá pedir acceso a un recurso distinto.
 
 ## El acceso entre cuentas necesita las dos mitades
 

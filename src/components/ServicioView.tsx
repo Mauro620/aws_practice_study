@@ -1,4 +1,6 @@
+import Link from 'next/link'
 import { MDXRemote } from 'next-mdx-remote/rsc'
+import { HERRAMIENTAS_POR_SERVICIO } from '@/lib/herramientas'
 import { MDX_OPTIONS } from '@/lib/mdx-options'
 import type { Servicio } from '@/lib/types'
 import { CidrCalculator } from './CidrCalculator'
@@ -9,6 +11,7 @@ import { VpcReferenceDiagram } from './VpcReferenceDiagram'
 const MDX_COMPONENTS = { VpcReferenceDiagram, CidrCalculator, VpcBuilder }
 
 export async function ServicioView({ servicio }: { servicio: Servicio }) {
+  const herramientas = HERRAMIENTAS_POR_SERVICIO[servicio.id] ?? []
   const niveles = await Promise.all(
     servicio.niveles.map(async (nivel) => ({
       numero: nivel.numero,
@@ -28,6 +31,26 @@ export async function ServicioView({ servicio }: { servicio: Servicio }) {
       <div className="prose prose-slate mt-8 max-w-none">
         <NivelSelector niveles={niveles} />
       </div>
+
+      {herramientas.length > 0 && (
+        <section className="mt-14">
+          <h2 className="text-xl font-semibold">Herramientas relacionadas</h2>
+          <p className="mt-2 text-foreground/70">Practicá lo que acabás de leer con estas herramientas interactivas.</p>
+          <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+            {herramientas.map((herramienta) => (
+              <li key={herramienta.href}>
+                <Link
+                  href={herramienta.href}
+                  className="block min-h-11 rounded-md border border-border p-4 hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  <span className="font-medium text-accent">{herramienta.label}</span>
+                  <p className="mt-1 text-sm text-foreground/70">{herramienta.descripcion}</p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {servicio.erroresFrecuentes.length > 0 && (
         <section className="mt-14">

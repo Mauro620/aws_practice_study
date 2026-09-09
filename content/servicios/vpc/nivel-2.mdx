@@ -11,7 +11,7 @@ El ejemplo más chico que efectivamente funciona: una VPC, una subred pública, 
 5. Lanzás una instancia EC2 en esa subred, con una IP pública asignada.
 6. Le asociás un Security Group que permite entrada por el puerto 443 (o 22 para acceso administrativo) desde tu propia IP.
 
-Con esos seis pasos ya tenés una instancia accesible desde Internet. Nada de esto funciona si falta una sola pieza: podés tener el Internet Gateway creado y adjunto, pero si la ruta `0.0.0.0/0` no apunta a él, o si la instancia no tiene IP pública, o si el Security Group no deja pasar el tráfico, seguís sin acceso. Las cuatro condiciones son necesarias en conjunto, no alternativas:
+Con esos seis pasos ya tenés una instancia accesible desde Internet. Nada de esto funciona si falta una sola pieza: podés tener el Internet Gateway creado y adjunto, pero si la ruta `0.0.0.0/0` no apunta a él, o si la instancia no tiene IP pública, o si el Security Group no deja pasar el tráfico, seguís sin acceso. Las cuatro condiciones son necesarias en conjunto, no alternativas. Podés armar esta misma VPC paso a paso en el [constructor visual de VPC](/herramientas/constructor-vpc), y comprobar la ruta del punto 4 en el [simulador de tablas de rutas](/herramientas/rutas):
 
 | # | Condición |
 | --- | --- |
@@ -20,7 +20,7 @@ Con esos seis pasos ya tenés una instancia accesible desde Internet. Nada de es
 | 3 | La instancia tiene IP pública o Elastic IP |
 | 4 | El Security Group y la NACL permiten el tráfico |
 
-Tamaños de red más comunes, para referencia al elegir el CIDR de la VPC o de una subred:
+Tamaños de red más comunes, para referencia al elegir el CIDR de la VPC o de una subred (probalos en la [calculadora de CIDR](/herramientas/cidr)):
 
 | CIDR | Máscara | Direcciones totales | Utilizables en una subred de AWS |
 | --- | --- | --- | --- |

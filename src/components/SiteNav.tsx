@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import type { ReactNode } from 'react'
+import { HERRAMIENTAS_TRANSVERSALES } from '@/lib/herramientas'
 import type { ServicioMeta } from '@/lib/types'
 
 type CourseModule = { id: string; label: string }
@@ -24,36 +25,6 @@ export const COURSE_MODULES: { category: string; modules: CourseModule[] }[] = [
     ],
   },
 ]
-
-type Lab = { href: string; label: string }
-
-export const LAB_GROUPS: { label: string; items: Lab[] }[] = [
-  {
-    label: 'Red y conectividad',
-    items: [
-      { href: '/herramientas/cidr', label: 'Calculadora de CIDR' },
-      { href: '/herramientas/constructor-vpc', label: 'Constructor visual de VPC' },
-      { href: '/herramientas/rutas', label: 'Simulador de tablas de rutas' },
-    ],
-  },
-  {
-    label: 'Cómputo y seguridad',
-    items: [
-      { href: '/herramientas/ec2', label: 'Explorador de tipos de instancia EC2' },
-      { href: '/herramientas/sg-nacl', label: 'Verificador SG vs NACL' },
-      { href: '/herramientas/iam', label: 'Evaluador de políticas IAM' },
-    ],
-  },
-  {
-    label: 'Práctica y costos',
-    items: [
-      { href: '/herramientas/comparador-costos', label: 'Comparador de costos EC2' },
-      { href: '/herramientas/motor-practica', label: 'Motor de práctica tipo examen' },
-    ],
-  },
-]
-
-export const LABS = LAB_GROUPS.flatMap(({ items }) => items)
 
 export function navLinkClassName(active: boolean) {
   return `block min-h-11 rounded-md px-2 py-2 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
@@ -107,35 +78,15 @@ function LearningNav({ servicios, pathname }: { servicios: ServicioMeta[]; pathn
               Guía de arquitectura AWS
             </NavLink>
           </li>
+          {HERRAMIENTAS_TRANSVERSALES.map((herramienta) => (
+            <li key={herramienta.href}>
+              <NavLink href={herramienta.href} pathname={pathname}>
+                {herramienta.label}
+              </NavLink>
+            </li>
+          ))}
         </ul>
       </section>
-    </nav>
-  )
-}
-
-function LabsNav({ pathname }: { pathname: string | null }) {
-  return (
-    <nav aria-label="Laboratorios interactivos" className="mt-6 space-y-2">
-      <h2 className="px-2 text-xs font-medium tracking-wide text-foreground/50 uppercase">Laboratorios interactivos</h2>
-      {LAB_GROUPS.map(({ label, items }) => {
-        const active = items.some((item) => item.href === pathname)
-
-        return (
-          <details key={label} open={active} aria-label={label} className="group">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center rounded-md px-2 py-2 text-sm font-medium text-foreground/80 hover:bg-black/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent [&::-webkit-details-marker]:hidden">
-              <span className="mr-2 text-foreground/45 transition-transform group-open:rotate-90" aria-hidden="true">›</span>
-              {label}
-            </summary>
-            <ul className="mt-1 ml-4 space-y-1 border-l border-border pl-2">
-              {items.map((item) => (
-                <li key={item.href}>
-                  <NavLink href={item.href} pathname={pathname}>{item.label}</NavLink>
-                </li>
-              ))}
-            </ul>
-          </details>
-        )
-      })}
     </nav>
   )
 }
@@ -152,7 +103,6 @@ export function SiteNav({ servicios }: { servicios: ServicioMeta[] }) {
         </summary>
         <div className="space-y-1 px-4 pb-4">
           <LearningNav servicios={servicios} pathname={pathname} />
-          <LabsNav pathname={pathname} />
         </div>
       </details>
 
@@ -160,7 +110,6 @@ export function SiteNav({ servicios }: { servicios: ServicioMeta[] }) {
         <NavLink href="/" pathname={pathname}>Curso AWS</NavLink>
         <div className="mt-4">
           <LearningNav servicios={servicios} pathname={pathname} />
-          <LabsNav pathname={pathname} />
         </div>
       </aside>
     </>

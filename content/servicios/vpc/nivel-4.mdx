@@ -28,7 +28,7 @@ Por eso una subred `/24` deja 251 IPs utilizables, no 254 — y una subred `/28`
 | Evaluación | Todas las reglas en conjunto | Por orden numérico, gana la primera coincidencia |
 | Comportamiento por defecto | Deniega toda entrada, permite toda salida | La NACL default permite todo el tráfico |
 
-La consecuencia práctica: si en un Security Group permitís la entrada al puerto 443, la respuesta sale automáticamente, sin regla adicional. En una NACL tendrías que permitir explícitamente también la salida por los puertos efímeros (1024–65535) — olvidarse de eso es un error común y silencioso.
+La consecuencia práctica: si en un Security Group permitís la entrada al puerto 443, la respuesta sale automáticamente, sin regla adicional. En una NACL tendrías que permitir explícitamente también la salida por los puertos efímeros (1024–65535) — olvidarse de eso es un error común y silencioso. Armá este mismo escenario y mirá capa por capa el resultado en el [verificador SG vs NACL](/herramientas/sg-nacl).
 
 **El VPC Peering no es transitivo.** Si la VPC A tiene peering con B, y B tiene peering con C, A no puede alcanzar a C — hace falta un peering directo entre A y C, o migrar a Transit Gateway si el número de VPCs conectadas crece.
 

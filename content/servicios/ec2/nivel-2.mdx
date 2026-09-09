@@ -5,7 +5,7 @@ titulo: Caso mínimo
 El ejemplo mínimo que efectivamente funciona. Asumimos que ya tenés una VPC con subred pública y route table con ruta `0.0.0.0/0 → igw-…` (ver Servicio 1 nivel-2). Lo que agregamos ahora es la instancia en sí.
 
 1. **Elegís la AMI** (la plantilla con el sistema operativo). Para un Linux, esto casi siempre es Amazon Linux 2023 — gratis, integrado, con AWS CLI y SSM Agent preinstalados.
-2. **Elegís el tipo de instancia** (el hardware virtual). Para una PC de oficina promedio, una `t3.micro` o `m6i.large` alcanza. Hay que coincidir la arquitectura del SO con la del procesador (Intel/AMD para AMIs x86, Graviton para AMIs ARM).
+2. **Elegís el tipo de instancia** (el hardware virtual). Para una PC de oficina promedio, una `t3.micro` o `m6i.large` alcanza. Hay que coincidir la arquitectura del SO con la del procesador (Intel/AMD para AMIs x86, Graviton para AMIs ARM). Compará familias y tamaños en el [explorador de tipos de instancia EC2](/herramientas/ec2).
 3. **Elegís o creás un Key Pair.** Es el archivo `.pem` que necesitás para entrar por SSH. Si lo perdés, perdés el acceso a esa instancia. (Windows usa `.ppk`.)
 4. **Elegís la subred.** Esto define la AZ y la IP privada que va a tener la instancia, y no se puede cambiar después.
 5. **Activás "Auto-assign Public IP"** si querés que reciba una IP pública efímera al arrancar.
