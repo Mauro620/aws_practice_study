@@ -1,657 +1,530 @@
 /**
- * Pure data and state logic for the reference architecture diagram
- * (/arquitectura-referencia). It ties together what the VPC, EC2, IAM,
- * Elasticidad and CloudFront modules teach in isolation. All text is plain
- * text (rendered as React children), with qualitative charge categories only.
+ * Pure data + state logic for the reference architecture diagram
+ * (/arquitectura-referencia). No React here: the component only renders what
+ * these functions return, following the route-tables.ts / network-acls.ts pattern.
+ *
+ * Two id spaces:
+ * - ComponenteId: an AWS concept with its own explanation panel (e.g. 'nat-gateway').
+ * - NodoId: a box drawn in the diagram (e.g. 'nat-a', 'nat-b'). Several nodes can
+ *   share one component, like the ALB present in both AZ.
  */
 
-export type ComponenteId =
-  | 'route53' | 'cloudfront' | 'acm' | 'waf' | 'shield' | 's3'
-  | 'internet-gateway' | 'vpc' | 'zona-disponibilidad' | 'subred-publica' | 'subred-privada'
-  | 'alb' | 'target-group' | 'nat-gateway' | 'auto-scaling-group' | 'ec2'
-  | 'rol-iam' | 'ebs' | 'rds' | 'security-groups' | 'tablas-rutas' | 'cloudwatch'
+// ---------------------------------------------------------------------------
+// Modes
+// ---------------------------------------------------------------------------
 
-export type NodoId =
-  | 'route53' | 'cloudfront' | 'acm' | 'waf' | 'shield' | 's3'
-  | 'internet-gateway' | 'vpc' | 'az-a' | 'az-b'
-  | 'subred-publica-a' | 'subred-publica-b' | 'subred-privada-a' | 'subred-privada-b'
-  | 'alb-a' | 'alb-b' | 'target-group' | 'nat-a' | 'nat-b' | 'auto-scaling-group'
-  | 'ec2-a' | 'ec2-b' | 'ebs-a' | 'ebs-b' | 'rds-primaria' | 'rds-standby'
-  | 'rol-iam' | 'security-groups' | 'tablas-rutas' | 'cloudwatch'
-
-export type Capa = 'borde' | 'publica' | 'privada' | 'datos' | 'transversal'
-export type ModoCobro = 'fijo-por-hora' | 'por-uso' | 'sin-costo'
 export type ModoId = 'trafico' | 'seguridad' | 'alta-disponibilidad' | 'costos' | 'ruta-aprendizaje'
-export type RutaId = 'estatico-hit' | 'estatico-miss' | 'dinamico'
-export type FallaId = 'instancia' | 'zona' | 'nat'
-export type Salud = 'ok' | 'caido' | 'degradado'
-/** 'usuario' is the requester outside AWS: it acts in traffic routes but is not a component. */
-export type Actor = NodoId | 'usuario'
 
-export type Componente = {
-  id: ComponenteId
-  nombre: string
-  queEs: string
-  porQue: string
-  siLoQuitas: string
-  cobro: { modos: ModoCobro[]; detalle: string }
-  modulo: { href?: string; etiqueta: string; nota?: string }
+export type Modo = {
+  id: ModoId
+  numero: number
+  label: string
+  descripcion: string
+  disponible: boolean
 }
 
-export type Nodo = {
-  id: NodoId
-  componente: ComponenteId
-  etiqueta: string
-  detalle?: string
-  capa: Capa
-  /** Containers (VPC, AZ, subnets, ASG) are drawn as boxes around other nodes. */
-  contenedor?: boolean
-  x: number
-  y: number
-  w: number
-  h: number
-}
-
-const M_VPC = { href: '/servicios/vpc', etiqueta: 'M3 Amazon VPC' }
-const M_EC2 = { href: '/servicios/ec2', etiqueta: 'M4 Amazon EC2' }
-const M_IAM = { href: '/servicios/iam', etiqueta: 'M5 Protección del acceso (AWS IAM)' }
-const M_ELASTICIDAD = { href: '/servicios/elasticidad', etiqueta: 'M6 Elasticidad' }
-const M_CLOUDFRONT = { href: '/servicios/cloudfront', etiqueta: 'M7 Entrega de contenido (CloudFront, HTTPS y S3)' }
-
-export const COMPONENTES: Componente[] = [
-  {
-    id: 'route53', nombre: 'Route 53',
-    queEs: 'El servicio de DNS de AWS. Traduce cafeteria.com a la dirección de la distribución de CloudFront mediante un registro ALIAS.',
-    porQue: 'El usuario recuerda un nombre, no una dirección. El registro ALIAS funciona en el dominio raíz, algo que un CNAME no puede hacer, y apunta directo a la distribución.',
-    siLoQuitas: 'Nadie llega al sitio por su nombre. Con un DNS de terceros tendrías que usar un CNAME, que no sirve en el dominio raíz cafeteria.com.',
-    cobro: { modos: ['por-uso'], detalle: 'Cuota mensual por zona alojada más un cargo por consultas DNS. Las consultas ALIAS hacia recursos de AWS no se cobran.' },
-    modulo: M_CLOUDFRONT,
-  },
-  {
-    id: 'cloudfront', nombre: 'CloudFront',
-    queEs: 'La CDN de AWS: una distribución que cachea contenido en edge locations cercanas al usuario y decide, por patrón de ruta, a qué origen va cada petición.',
-    porQue: 'Cada cache hit es una petición que no llega ni a S3 ni al ALB: menos latencia para el usuario y menos carga en el origen, así que el ASG necesita escalar mucho menos.',
-    siLoQuitas: 'Todo el tráfico, estático y dinámico, pega directo contra el origen. El bucket tendría que ser público para servir archivos y el ALB absorbería también las peticiones de imágenes y CSS.',
-    cobro: { modos: ['por-uso'], detalle: 'Por datos transferidos hacia Internet y por número de peticiones. Las invalidaciones tienen un cupo mensual gratuito; la Price Class limita desde qué edge locations se sirve.' },
-    modulo: M_CLOUDFRONT,
-  },
-  {
-    id: 'acm', nombre: 'ACM',
-    queEs: 'AWS Certificate Manager emite y renueva los certificados TLS que permiten servir cafeteria.com por HTTPS.',
-    porQue: 'La distribución necesita un certificado que cubra el dominio propio. ACM lo renueva solo, lo que elimina el clásico sitio caído por certificado vencido. Para CloudFront se solicita en us-east-1.',
-    siLoQuitas: 'Solo podrías usar HTTPS con el dominio d1a2b3.cloudfront.net o gestionar certificados a mano, con el riesgo de que venzan sin que nadie lo note.',
-    cobro: { modos: ['sin-costo'], detalle: 'Gratuito para certificados públicos usados con servicios integrados como CloudFront y el ALB (los certificados exportables tienen costo, por verificar).' },
-    modulo: M_CLOUDFRONT,
-  },
-  {
-    id: 'waf', nombre: 'AWS WAF',
-    queEs: 'Un firewall de aplicaciones web que se asocia a la distribución y filtra peticiones con reglas de capa 7.',
-    porQue: 'Bloquea en el borde patrones como inyección SQL, excesos de tasa desde una misma IP o IPs de mala reputación, antes de que la petición llegue a la VPC.',
-    siLoQuitas: 'Las peticiones maliciosas bien formadas llegan hasta la aplicación. Shield Standard no las detiene porque protege capas 3 y 4, no el contenido de la petición HTTP.',
-    cobro: { modos: ['por-uso'], detalle: 'Cargo mensual por cada web ACL y por cada regla, más un cargo por volumen de peticiones inspeccionadas.' },
-    modulo: M_CLOUDFRONT,
-  },
-  {
-    id: 'shield', nombre: 'Shield Standard',
-    queEs: 'La protección contra DDoS de capas 3 y 4 que AWS activa automáticamente en CloudFront y Route 53.',
-    porQue: 'Absorbe ataques volumétricos de red en el borde. Sumado a que la CDN reparte la carga entre muchas edge locations y oculta el origen, el ALB nunca ve ese tráfico.',
-    siLoQuitas: 'No se puede quitar: viene incluido. Lo que pierde la arquitectura si esquivás CloudFront es justamente esa capa de absorción en el borde.',
-    cobro: { modos: ['sin-costo'], detalle: 'Shield Standard no tiene costo. Shield Advanced es una suscripción aparte que este curso no usa.' },
-    modulo: M_CLOUDFRONT,
-  },
-  {
-    id: 's3', nombre: 'Bucket S3',
-    queEs: 'El almacenamiento de objetos donde viven los archivos estáticos del sitio (HTML, CSS, JS, imágenes). Es el origen de CloudFront para el contenido estático.',
-    porQue: 'El bucket queda privado con Block Public Access activado; solo CloudFront puede leerlo mediante OAC. El versionado permite recuperar lo que alguien borra por error.',
-    siLoQuitas: 'CloudFront no tiene de dónde sacar los estáticos en un cache miss; tendrías que servirlos desde las EC2, que también escalarían por imágenes y CSS.',
-    cobro: { modos: ['por-uso'], detalle: 'Por GB almacenado al mes según la clase de almacenamiento, por peticiones y por transferencia. Con versionado, cada versión se factura por separado.' },
-    modulo: M_CLOUDFRONT,
-  },
-  {
-    id: 'internet-gateway', nombre: 'Internet Gateway',
-    queEs: 'La puerta de la VPC hacia Internet, en ambos sentidos. Solo puede haber uno por VPC.',
-    porQue: 'Permite que las peticiones de CloudFront lleguen al ALB. Una subred es pública solo si su tabla de rutas tiene 0.0.0.0/0 apuntando al Internet Gateway.',
-    siLoQuitas: 'La VPC queda aislada: el ALB deja de ser alcanzable desde Internet y el NAT Gateway pierde su salida, así que las instancias privadas tampoco pueden salir.',
-    cobro: { modos: ['sin-costo'], detalle: 'El Internet Gateway no tiene cargo propio; se paga la transferencia de datos de los recursos que lo usan.' },
-    modulo: M_VPC,
-  },
-  {
-    id: 'vpc', nombre: 'VPC',
-    queEs: 'La red privada virtual de la arquitectura, con el bloque 10.0.0.0/16 en la región us-east-1. Define dónde vive cada recurso y cómo se conecta.',
-    porQue: 'Separa la entrada pública de los servicios internos: el ALB y el NAT quedan en subredes públicas; la aplicación y la base de datos, en privadas y fuera del alcance directo de Internet.',
-    siLoQuitas: 'No hay dónde lanzar las EC2, el ALB ni RDS: todo lo que está dentro del recuadro depende de la VPC. Ampliar el CIDR después de crear recursos es costoso, por eso se planifica antes.',
-    cobro: { modos: ['sin-costo'], detalle: 'La VPC no tiene cargo propio; lo que cuesta es lo que ponés adentro, como el NAT Gateway y el balanceador.' },
-    modulo: M_VPC,
-  },
-  {
-    id: 'zona-disponibilidad', nombre: 'Zona de disponibilidad',
-    queEs: 'Uno o más centros de datos aislados dentro de la región. La arquitectura usa dos: us-east-1a y us-east-1b.',
-    porQue: 'Repetir el mismo patrón en dos AZ evita que una sola zona sea un punto único de caída: si us-east-1a falla, us-east-1b sigue atendiendo.',
-    siLoQuitas: 'Con una sola AZ, cualquier falla de esa zona tumba toda la aplicación y la base de datos a la vez. Es un prototipo, no una arquitectura de producción.',
-    cobro: { modos: ['sin-costo'], detalle: 'Usar varias AZ no tiene cargo propio, pero el tráfico entre AZ distintas sí se cobra.' },
-    modulo: M_VPC,
-  },
-  {
-    id: 'subred-publica', nombre: 'Subred pública',
-    queEs: 'Una subred cuya tabla de rutas envía 0.0.0.0/0 al Internet Gateway. Aquí están 10.0.1.0/24 en us-east-1a y 10.0.2.0/24 en us-east-1b.',
-    porQue: 'Aloja lo único que debe recibir o dar salida a Internet: los nodos del ALB y los NAT Gateway. Concentra la exposición en pocos recursos controlados.',
-    siLoQuitas: 'El ALB público y el NAT Gateway no tienen dónde vivir: sin subredes públicas, Internet no llega al balanceador y las privadas pierden su salida.',
-    cobro: { modos: ['sin-costo'], detalle: 'Las subredes no tienen cargo propio; se pagan los recursos que se lanzan en ellas.' },
-    modulo: M_VPC,
-  },
-  {
-    id: 'subred-privada', nombre: 'Subred privada',
-    queEs: 'Una subred sin ruta al Internet Gateway: 10.0.11.0/24 en us-east-1a y 10.0.12.0/24 en us-east-1b. Solo sale a Internet a través del NAT Gateway.',
-    porQue: 'Las EC2 de aplicación y la base de datos no necesitan IP pública: reciben tráfico solo desde el ALB y no se pueden alcanzar directamente desde Internet.',
-    siLoQuitas: 'Tendrías que poner la aplicación y la base de datos en subredes públicas, expuestas a escaneos, y la seguridad dependería solo de que ninguna regla de Security Group se abra de más.',
-    cobro: { modos: ['sin-costo'], detalle: 'Las subredes no tienen cargo propio; se pagan los recursos que se lanzan en ellas.' },
-    modulo: M_VPC,
-  },
-  {
-    id: 'alb', nombre: 'Application Load Balancer',
-    queEs: 'El balanceador de capa 7 que recibe las peticiones dinámicas y las reparte entre las instancias sanas. Es un solo ALB con un nodo en cada AZ.',
-    porQue: 'Ofrece un DNS estable mientras las instancias cambian detrás, termina TLS y solo envía tráfico a los destinos que pasan el health check del Target Group.',
-    siLoQuitas: 'Las EC2 necesitarían IP pública y cada instancia nueva cambiaría la dirección de entrada. Una instancia caída seguiría recibiendo usuarios, y el ASG no tendría a quién registrar sus instancias.',
-    cobro: { modos: ['fijo-por-hora', 'por-uso'], detalle: 'Un cargo por cada hora que el balanceador existe, más un cargo por capacidad consumida (unidades de capacidad del balanceador).' },
-    modulo: { href: '/guia-arquitectura#alb-target-groups', etiqueta: 'Guía de arquitectura · 05 ALB y Target Groups', nota: 'También aparece en M6 Elasticidad, junto al Auto Scaling Group.' },
-  },
-  {
-    id: 'target-group', nombre: 'Target Group',
-    queEs: 'La lista de destinos registrados (las EC2) a los que el ALB reenvía tráfico, junto con el health check que decide cuáles están listos.',
-    porQue: 'El ASG registra y retira instancias aquí automáticamente, y el health check saca del balanceo a las que fallan, para no enviar usuarios a una instancia que no responde.',
-    siLoQuitas: 'El listener del ALB no tiene a dónde reenviar las peticiones. Sin health check, una instancia con Apache caído seguiría recibiendo su parte del tráfico.',
-    cobro: { modos: ['sin-costo'], detalle: 'El Target Group no tiene cargo propio: forma parte del balanceador.' },
-    modulo: { href: '/guia-arquitectura#alb-target-groups', etiqueta: 'Guía de arquitectura · 05 ALB y Target Groups', nota: 'También aparece en M6 Elasticidad, junto al Auto Scaling Group.' },
-  },
-  {
-    id: 'nat-gateway', nombre: 'NAT Gateway',
-    queEs: 'El servicio que permite a las instancias de subredes privadas iniciar conexiones hacia Internet sin aceptar conexiones entrantes. Hay uno por AZ, en la subred pública.',
-    porQue: 'Las EC2 privadas necesitan salir para instalar actualizaciones con dnf o llamar a APIs externas. Uno por AZ evita que un solo NAT sea punto único de falla y evita tráfico entre zonas.',
-    siLoQuitas: 'Las instancias privadas siguen atendiendo peticiones entrantes por el ALB, pero no pueden descargar paquetes ni llamar a servicios externos.',
-    cobro: { modos: ['fijo-por-hora', 'por-uso'], detalle: 'Costo por hora más costo por GB procesado. Suele ser uno de los rubros más caros de una VPC mal diseñada.' },
-    modulo: M_VPC,
-  },
-  {
-    id: 'auto-scaling-group', nombre: 'Auto Scaling Group',
-    queEs: 'El grupo que decide cuántas instancias debe haber, entre un mínimo y un máximo, y las crea o termina a partir de un Launch Template.',
-    porQue: 'Reemplaza instancias caídas sin intervención y crece o decrece con la carga. Sobre dos AZ, si una zona falla lanza los reemplazos en la otra.',
-    siLoQuitas: 'Una instancia caída queda caída hasta que alguien la reemplace a mano, y la capacidad no sigue a la demanda: pagás capacidad ociosa o te quedás corto en el pico.',
-    cobro: { modos: ['sin-costo'], detalle: 'El Auto Scaling Group no tiene cargo propio; se pagan las EC2 que lanza y las alarmas de CloudWatch que usa.' },
-    modulo: M_ELASTICIDAD,
-  },
-  {
-    id: 'ec2', nombre: 'Instancia EC2',
-    queEs: 'El servidor virtual que ejecuta la aplicación. Vive en una subred privada y lo lanza el Auto Scaling Group desde un Launch Template.',
-    porQue: 'Procesa las peticiones dinámicas que no se pueden cachear. Al ser reemplazable, no debe guardar estado local: la sesión o los datos viven fuera de la instancia.',
-    siLoQuitas: 'Las rutas dinámicas, como la API de pedidos, no tienen quién las procese: el ALB responde con error porque el Target Group no tiene destinos sanos.',
-    cobro: { modos: ['fijo-por-hora'], detalle: 'Por tiempo encendida según el tipo de instancia (On-Demand). Savings Plans y Spot bajan la tarifa a cambio de compromiso o de posibles interrupciones.' },
-    modulo: M_EC2,
-  },
-  {
-    id: 'rol-iam', nombre: 'Rol de IAM',
-    queEs: 'Una identidad con permisos que la instancia asume mediante un perfil de instancia. AWS le entrega credenciales temporales que rotan solas.',
-    porQue: 'La aplicación puede llamar a otros servicios de AWS sin guardar Access Keys en el servidor. Cada instancia que lanza el ASG lleva el mismo rol desde el Launch Template.',
-    siLoQuitas: 'La tentación es copiar claves de acceso en la instancia; al crear una AMI desde ella, todas las instancias nuevas heredan esas claves. Es el error más grave del módulo de EC2.',
-    cobro: { modos: ['sin-costo'], detalle: 'IAM no tiene costo: roles, políticas y perfiles de instancia son gratuitos.' },
-    modulo: M_IAM,
-  },
-  {
-    id: 'ebs', nombre: 'Volumen EBS',
-    queEs: 'El disco de red de cada instancia EC2. Vive en la misma AZ que la instancia y se respalda con snapshots.',
-    porQue: 'Es donde está el sistema operativo y la aplicación. Con Delete on termination el volumen raíz se destruye junto con la instancia, algo aceptable si la instancia es reemplazable.',
-    siLoQuitas: 'La instancia no tiene disco donde arrancar. Si guardás datos importantes en un volumen que se borra al terminar la instancia, el ASG los destruye al reemplazarla.',
-    cobro: { modos: ['por-uso'], detalle: 'Por GB aprovisionado al mes, aunque la instancia esté detenida. Los snapshots se cobran por el almacenamiento que ocupan.' },
-    modulo: M_EC2,
-  },
-  {
-    id: 'rds', nombre: 'RDS Multi-AZ',
-    queEs: 'La base de datos relacional administrada, desplegada como primaria en us-east-1a y standby sincrónica en us-east-1b.',
-    porQue: 'Los pedidos tienen que sobrevivir a la instancia que los procesó. Con Multi-AZ, si la primaria o su zona fallan, RDS promueve la standby y la aplicación sigue usando el mismo endpoint.',
-    siLoQuitas: 'Los datos quedarían en el disco de instancias que el ASG termina y reemplaza. Sin la standby, la caída de us-east-1a deja la aplicación sin base de datos.',
-    cobro: { modos: ['fijo-por-hora', 'por-uso'], detalle: 'Por hora de instancia de base de datos (la standby de Multi-AZ también se paga), más almacenamiento y respaldos.' },
-    modulo: { href: '/servicios/ec2', etiqueta: 'M4 Amazon EC2 · Caso realista', nota: 'RDS no tiene un módulo dedicado en este curso: aparece como la capa de datos de la arquitectura de alta disponibilidad del caso realista de EC2.' },
-  },
-  {
-    id: 'security-groups', nombre: 'Security Groups',
-    queEs: 'Firewalls stateful asociados a la interfaz de red de cada recurso: uno para el ALB, uno para la aplicación y uno para la base de datos.',
-    porQue: 'Encadenan el acceso: el SG del ALB acepta 80 y 443 desde Internet, el de aplicación solo desde el SG del ALB y el de datos solo el puerto del motor desde el SG de aplicación.',
-    siLoQuitas: 'No se pueden quitar: todo recurso tiene al menos uno. El riesgo real es abrirlos de más, por ejemplo 0.0.0.0/0 en SSH o en el puerto de la base de datos.',
-    cobro: { modos: ['sin-costo'], detalle: 'Los Security Groups no tienen costo.' },
-    modulo: { href: '/guia-arquitectura#security-groups', etiqueta: 'Guía de arquitectura · 03 Security Groups' },
-  },
-  {
-    id: 'tablas-rutas', nombre: 'Tablas de rutas',
-    queEs: 'Las reglas que deciden a dónde va el tráfico que sale de cada subred. Toda tabla incluye una ruta local para que las subredes de la VPC se comuniquen entre sí.',
-    porQue: 'Son las que hacen pública o privada a una subred: 0.0.0.0/0 hacia el Internet Gateway en las públicas y hacia el NAT Gateway de la misma AZ en las privadas.',
-    siLoQuitas: 'Sin la ruta al Internet Gateway, la subred pública deja de serlo aunque el IGW esté adjunto; sin la ruta al NAT, las instancias privadas pierden la salida a Internet.',
-    cobro: { modos: ['sin-costo'], detalle: 'Las tablas de rutas no tienen costo.' },
-    modulo: M_VPC,
-  },
-  {
-    id: 'cloudwatch', nombre: 'CloudWatch',
-    queEs: 'El servicio de métricas y alarmas de AWS. Mide, por ejemplo, el CPUUtilization promedio del grupo de instancias.',
-    porQue: 'La política de target tracking del ASG crea alarmas de CloudWatch y escala para mantener la métrica cerca del objetivo, por ejemplo 60% de CPU.',
-    siLoQuitas: 'El ASG no se entera de que la carga subió o bajó: solo mantiene la capacidad deseada fija. Ojo: la RAM y el disco no se miden por defecto, requieren el CloudWatch Agent.',
-    cobro: { modos: ['por-uso'], detalle: 'Las métricas básicas de EC2 no tienen costo; las métricas personalizadas, las alarmas y los logs se cobran por uso.' },
-    modulo: M_ELASTICIDAD,
-  },
-]
-
-const COMPONENTES_POR_ID = new Map(COMPONENTES.map((componente) => [componente.id, componente]))
-
-export function getComponente(id: ComponenteId): Componente {
-  const componente = COMPONENTES_POR_ID.get(id)
-  if (!componente) throw new Error(`Componente desconocido: ${id}`)
-  return componente
-}
-
-/** Diagram coordinates share one 960 × 1000 space; containers are listed before their children. */
-export const DIAGRAMA = { x: 0, y: 0, w: 960, h: 1000 }
-
-export const NODOS: Nodo[] = [
-  // Borde (fuera de la VPC)
-  { id: 'route53', componente: 'route53', etiqueta: 'Route 53', detalle: 'ALIAS', capa: 'borde', x: 400, y: 84, w: 160, h: 64 },
-  { id: 'cloudfront', componente: 'cloudfront', etiqueta: 'CloudFront', detalle: 'edge locations', capa: 'borde', x: 400, y: 168, w: 160, h: 64 },
-  { id: 'acm', componente: 'acm', etiqueta: 'ACM', detalle: 'us-east-1', capa: 'borde', x: 590, y: 168, w: 100, h: 64 },
-  { id: 'waf', componente: 'waf', etiqueta: 'WAF', detalle: 'capa 7', capa: 'borde', x: 705, y: 168, w: 100, h: 64 },
-  { id: 'shield', componente: 'shield', etiqueta: 'Shield', detalle: 'Standard', capa: 'borde', x: 820, y: 168, w: 120, h: 64 },
-  { id: 's3', componente: 's3', etiqueta: 'Bucket S3', detalle: 'privado · OAC', capa: 'datos', x: 60, y: 168, w: 180, h: 64 },
-
-  // Contenedores de red
-  { id: 'vpc', componente: 'vpc', etiqueta: 'VPC', detalle: '10.0.0.0/16', capa: 'transversal', contenedor: true, x: 20, y: 272, w: 920, h: 620 },
-  { id: 'internet-gateway', componente: 'internet-gateway', etiqueta: 'Internet Gateway', capa: 'publica', x: 390, y: 250, w: 180, h: 48 },
-  { id: 'az-a', componente: 'zona-disponibilidad', etiqueta: 'AZ', detalle: 'us-east-1a', capa: 'transversal', contenedor: true, x: 36, y: 316, w: 436, h: 560 },
-  { id: 'az-b', componente: 'zona-disponibilidad', etiqueta: 'AZ', detalle: 'us-east-1b', capa: 'transversal', contenedor: true, x: 488, y: 316, w: 436, h: 560 },
-  { id: 'subred-publica-a', componente: 'subred-publica', etiqueta: 'Subred pública', detalle: '10.0.1.0/24', capa: 'publica', contenedor: true, x: 52, y: 352, w: 404, h: 116 },
-  { id: 'subred-publica-b', componente: 'subred-publica', etiqueta: 'Subred pública', detalle: '10.0.2.0/24', capa: 'publica', contenedor: true, x: 504, y: 352, w: 404, h: 116 },
-  { id: 'subred-privada-a', componente: 'subred-privada', etiqueta: 'Subred privada', detalle: '10.0.11.0/24', capa: 'privada', contenedor: true, x: 52, y: 552, w: 404, h: 308 },
-  { id: 'subred-privada-b', componente: 'subred-privada', etiqueta: 'Subred privada', detalle: '10.0.12.0/24', capa: 'privada', contenedor: true, x: 504, y: 552, w: 404, h: 308 },
-  { id: 'auto-scaling-group', componente: 'auto-scaling-group', etiqueta: 'Auto Scaling Group', detalle: 'mín · deseada · máx', capa: 'privada', contenedor: true, x: 68, y: 588, w: 824, h: 116 },
-
-  // Subredes públicas
-  { id: 'alb-a', componente: 'alb', etiqueta: 'ALB', detalle: 'nodo en 1a', capa: 'publica', x: 72, y: 388, w: 170, h: 64 },
-  { id: 'nat-a', componente: 'nat-gateway', etiqueta: 'NAT Gateway', detalle: 'salida de 1a', capa: 'publica', x: 266, y: 388, w: 170, h: 64 },
-  { id: 'alb-b', componente: 'alb', etiqueta: 'ALB', detalle: 'nodo en 1b', capa: 'publica', x: 524, y: 388, w: 170, h: 64 },
-  { id: 'nat-b', componente: 'nat-gateway', etiqueta: 'NAT Gateway', detalle: 'salida de 1b', capa: 'publica', x: 718, y: 388, w: 170, h: 64 },
-
-  // Entre las capas pública y privada: el Target Group es del ALB, no de una AZ
-  { id: 'target-group', componente: 'target-group', etiqueta: 'Target Group', detalle: 'health check', capa: 'privada', x: 390, y: 480, w: 180, h: 60 },
-
-  // Subredes privadas
-  { id: 'ec2-a', componente: 'ec2', etiqueta: 'EC2', detalle: 'aplicación', capa: 'privada', x: 88, y: 624, w: 170, h: 64 },
-  { id: 'ebs-a', componente: 'ebs', etiqueta: 'EBS', detalle: 'disco de 1a', capa: 'datos', x: 272, y: 624, w: 160, h: 64 },
-  { id: 'ec2-b', componente: 'ec2', etiqueta: 'EC2', detalle: 'aplicación', capa: 'privada', x: 528, y: 624, w: 170, h: 64 },
-  { id: 'ebs-b', componente: 'ebs', etiqueta: 'EBS', detalle: 'disco de 1b', capa: 'datos', x: 712, y: 624, w: 160, h: 64 },
-  { id: 'rds-primaria', componente: 'rds', etiqueta: 'RDS primaria', detalle: 'Multi-AZ', capa: 'datos', x: 88, y: 760, w: 200, h: 64 },
-  { id: 'rds-standby', componente: 'rds', etiqueta: 'RDS standby', detalle: 'Multi-AZ', capa: 'datos', x: 540, y: 760, w: 200, h: 64 },
-
-  // Transversales
-  { id: 'tablas-rutas', componente: 'tablas-rutas', etiqueta: 'Tablas de rutas', capa: 'transversal', x: 20, y: 920, w: 215, h: 64 },
-  { id: 'security-groups', componente: 'security-groups', etiqueta: 'Security Groups', capa: 'transversal', x: 255, y: 920, w: 215, h: 64 },
-  { id: 'rol-iam', componente: 'rol-iam', etiqueta: 'Rol de IAM', detalle: 'perfil de instancia', capa: 'transversal', x: 490, y: 920, w: 215, h: 64 },
-  { id: 'cloudwatch', componente: 'cloudwatch', etiqueta: 'CloudWatch', detalle: 'métricas y alarmas', capa: 'transversal', x: 725, y: 920, w: 215, h: 64 },
-]
-
-export type CapaApilada = { capa: Capa; titulo: string; descripcion: string; grupos: { titulo: string; nodos: NodoId[] }[] }
-
-/** Narrow-screen order: edge → public network → private network → data → cross-cutting. */
-export const CAPAS_APILADAS: CapaApilada[] = [
-  {
-    capa: 'borde', titulo: 'Borde', descripcion: 'Fuera de la VPC, cerca del usuario.',
-    grupos: [
-      { titulo: 'DNS y entrega', nodos: ['route53', 'cloudfront'] },
-      { titulo: 'Protección y HTTPS', nodos: ['acm', 'waf', 'shield'] },
-    ],
-  },
-  {
-    capa: 'publica', titulo: 'Red pública', descripcion: 'Lo único que recibe o da salida a Internet.',
-    grupos: [
-      { titulo: 'Entrada a la VPC', nodos: ['internet-gateway'] },
-      { titulo: 'us-east-1a', nodos: ['subred-publica-a', 'alb-a', 'nat-a'] },
-      { titulo: 'us-east-1b', nodos: ['subred-publica-b', 'alb-b', 'nat-b'] },
-    ],
-  },
-  {
-    capa: 'privada', titulo: 'Red privada', descripcion: 'La aplicación, sin IP pública.',
-    grupos: [
-      { titulo: 'Balanceo y escalado', nodos: ['target-group', 'auto-scaling-group'] },
-      { titulo: 'us-east-1a', nodos: ['subred-privada-a', 'ec2-a'] },
-      { titulo: 'us-east-1b', nodos: ['subred-privada-b', 'ec2-b'] },
-    ],
-  },
-  {
-    capa: 'datos', titulo: 'Datos', descripcion: 'Donde persiste lo que no puede perderse.',
-    grupos: [
-      { titulo: 'Base de datos', nodos: ['rds-primaria', 'rds-standby'] },
-      { titulo: 'Discos de las instancias', nodos: ['ebs-a', 'ebs-b'] },
-      { titulo: 'Objetos estáticos', nodos: ['s3'] },
-    ],
-  },
-  {
-    capa: 'transversal', titulo: 'Transversal', descripcion: 'Envuelve o gobierna a todas las capas.',
-    grupos: [
-      { titulo: 'Red', nodos: ['vpc', 'az-a', 'az-b', 'tablas-rutas'] },
-      { titulo: 'Seguridad e identidad', nodos: ['security-groups', 'rol-iam'] },
-      { titulo: 'Observación', nodos: ['cloudwatch'] },
-    ],
-  },
-]
-
-const NODOS_POR_ID = new Map(NODOS.map((nodo) => [nodo.id, nodo]))
-
-export function getNodo(id: NodoId): Nodo {
-  const nodo = NODOS_POR_ID.get(id)
-  if (!nodo) throw new Error(`Nodo desconocido: ${id}`)
-  return nodo
-}
-
-// ─── Modos ─────────────────────────────────────────────────────────────────
-
-export type Modo = { id: ModoId; numero: number; titulo: string; descripcion: string; disponible: boolean }
-
+/** Full, ordered mode catalogue. Later phases flip `disponible` and add UI; ids and numbers never change. */
 export const MODOS: Modo[] = [
-  { id: 'trafico', numero: 1, titulo: 'Flujo de tráfico', descripcion: 'Seguí una petición paso a paso, del usuario a los datos y de vuelta.', disponible: true },
-  { id: 'seguridad', numero: 2, titulo: 'Seguridad', descripcion: 'Qué protege cada capa y qué deja sin cubrir.', disponible: true },
-  { id: 'alta-disponibilidad', numero: 3, titulo: 'Alta disponibilidad', descripcion: 'Inyectá una falla y mirá qué sigue funcionando.', disponible: true },
-  { id: 'costos', numero: 4, titulo: 'Costos', descripcion: 'Qué cobra por hora, qué por uso y qué es gratis.', disponible: true },
-  { id: 'ruta-aprendizaje', numero: 5, titulo: 'Ruta de aprendizaje', descripcion: 'Qué ya dominás y qué módulo sigue.', disponible: true },
+  { id: 'trafico', numero: 1, label: 'Flujo de tráfico', descripcion: 'Seguí una petición paso a paso, desde el usuario hasta los datos y de vuelta.', disponible: true },
+  { id: 'seguridad', numero: 2, label: 'Seguridad', descripcion: 'Capas de control de acceso de la arquitectura.', disponible: false },
+  { id: 'alta-disponibilidad', numero: 3, label: 'Alta disponibilidad', descripcion: 'Provocá fallas y mirá cómo responde el sistema.', disponible: true },
+  { id: 'costos', numero: 4, label: 'Costos', descripcion: 'Estimación de costos por componente.', disponible: false },
+  { id: 'ruta-aprendizaje', numero: 5, label: 'Ruta de aprendizaje', descripcion: 'Orden sugerido para estudiar cada pieza.', disponible: false },
 ]
 
 export function modosDisponibles(): Modo[] {
   return MODOS.filter(({ disponible }) => disponible)
 }
 
-// ─── Aristas ─────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Components (panel content)
+// ---------------------------------------------------------------------------
 
-export type VarianteId = 'minima' | 'intermedia' | 'completa'
+export type Capa = 'borde' | 'publica' | 'privada' | 'datos' | 'transversal'
 
-export type Arista = {
-  de: Actor
-  a: NodoId
-  punteada?: boolean
-  /** Drawn as a curve around the nodes in between (the HTTPS leg skips Route 53). */
-  curva?: boolean
-  /** Only exists in these variants; otherwise it exists wherever both ends exist. */
-  variantes?: VarianteId[]
+export const CAPA_LABEL: Record<Capa, string> = {
+  borde: 'Borde global',
+  publica: 'Red pública',
+  privada: 'Red privada',
+  datos: 'Datos',
+  transversal: 'Transversal',
 }
 
-export const ARISTAS: Arista[] = [
-  { de: 'usuario', a: 'route53' },
-  { de: 'usuario', a: 'cloudfront', curva: true },
-  { de: 'route53', a: 'cloudfront' },
-  { de: 'cloudfront', a: 's3' },
-  { de: 'cloudfront', a: 'acm', punteada: true },
-  { de: 'acm', a: 'waf', punteada: true },
-  { de: 'waf', a: 'shield', punteada: true },
-  { de: 'cloudfront', a: 'internet-gateway' },
-  { de: 'usuario', a: 'internet-gateway', variantes: ['minima', 'intermedia'] },
-  { de: 'internet-gateway', a: 'ec2-a', variantes: ['minima'] },
-  { de: 'internet-gateway', a: 'alb-a' },
-  { de: 'internet-gateway', a: 'alb-b' },
-  { de: 'alb-a', a: 'target-group' },
-  { de: 'alb-b', a: 'target-group' },
-  { de: 'target-group', a: 'ec2-a' },
-  { de: 'target-group', a: 'ec2-b' },
-  { de: 'ec2-a', a: 'ebs-a' },
-  { de: 'ec2-b', a: 'ebs-b' },
-  { de: 'ec2-a', a: 'nat-a', punteada: true },
-  { de: 'ec2-b', a: 'nat-b', punteada: true },
-  { de: 'ec2-a', a: 'rds-primaria' },
-  { de: 'ec2-b', a: 'rds-primaria' },
-  { de: 'rds-primaria', a: 'rds-standby', punteada: true },
+export type ModoCobro = 'fijo-por-hora' | 'fijo-mensual' | 'por-uso' | 'sin-costo'
+
+export const MODO_COBRO_LABEL: Record<ModoCobro, string> = {
+  'fijo-por-hora': 'Fijo por hora',
+  'fijo-mensual': 'Fijo mensual',
+  'por-uso': 'Por uso',
+  'sin-costo': 'Sin costo',
+}
+
+export type ComponenteId =
+  | 'route53' | 'cloudfront' | 'acm' | 'waf' | 'shield' | 's3'
+  | 'internet-gateway' | 'vpc' | 'zona-disponibilidad' | 'subred-publica' | 'subred-privada'
+  | 'alb' | 'target-group' | 'nat-gateway' | 'auto-scaling-group' | 'ec2' | 'rol-iam' | 'ebs'
+  | 'rds' | 'security-groups' | 'tablas-rutas' | 'cloudwatch'
+
+export type Componente = {
+  id: ComponenteId
+  nombre: string
+  /** 1. Qué es — one line. */
+  queEs: string
+  /** 2. En qué módulo se estudia. `href` null only if nothing in the app covers it. */
+  modulo: { href: string | null; etiqueta: string; nota?: string }
+  /** 3. Por qué está aquí. */
+  porQue: string
+  /** 4. Qué se rompe si lo quitás. */
+  siLoQuitas: string
+  /** 5. Cómo cobra — qualitative only, no prices. */
+  cobro: { modos: ModoCobro[]; detalle: string }
+}
+
+export const COMPONENTES: Componente[] = [
+  {
+    id: 'route53',
+    nombre: 'Amazon Route 53',
+    queEs: 'El DNS administrado de AWS: traduce cdn.miapp.com a la distribución de CloudFront mediante un registro ALIAS.',
+    modulo: { href: '/servicios/cloudfront', etiqueta: 'M7 Entrega de contenido · nivel 3, Dominio propio con Route 53' },
+    porQue: 'Los usuarios necesitan un nombre propio y estable. Un registro ALIAS apunta el dominio a la distribución sin exponer el nombre asignado por AWS y, a diferencia de un CNAME, también funciona en el apex del dominio.',
+    siLoQuitas: 'El dominio propio deja de resolver: solo se podría entrar con el nombre xxxx.cloudfront.net que asigna AWS, y el certificado de ACM emitido para cdn.miapp.com dejaría de tener uso.',
+    cobro: { modos: ['fijo-mensual', 'por-uso'], detalle: 'Cargo mensual por cada zona alojada más un cargo por consultas DNS. Las consultas ALIAS hacia una distribución de CloudFront no se cobran.' },
+  },
+  {
+    id: 'cloudfront',
+    nombre: 'Amazon CloudFront',
+    queEs: 'La CDN de AWS: sirve el sitio desde edge locations cercanas al usuario y reenvía al origen lo que no tiene en caché.',
+    modulo: { href: '/servicios/cloudfront', etiqueta: 'M7 Entrega de contenido · niveles 2 y 3' },
+    porQue: 'Es la única puerta de entrada HTTPS: cachea /static/* en el borde (menos latencia y menos carga en el origen) y reenvía /api/* al ALB. Además oculta el bucket detrás de OAC y concentra en el borde la protección de Shield y WAF.',
+    siLoQuitas: 'Cada petición viaja hasta us-east-1: más latencia para usuarios lejanos, todo el tráfico estático cae sobre el origen, el bucket tendría que ser público para servir el sitio y se pierde el punto donde aplicar WAF y el certificado del dominio.',
+    cobro: { modos: ['por-uso'], detalle: 'Por datos transferidos hacia los usuarios y por cantidad de peticiones; la tarifa varía según la región del usuario y la price class elegida. Las invalidaciones por encima de la cuota gratuita también se cobran.' },
+  },
+  {
+    id: 'acm',
+    nombre: 'AWS Certificate Manager (ACM)',
+    queEs: 'Emite y renueva automáticamente el certificado TLS de cdn.miapp.com que CloudFront presenta a los navegadores.',
+    modulo: { href: '/servicios/cloudfront', etiqueta: 'M7 Entrega de contenido · nivel 3, El certificado con ACM (y nivel 4, us-east-1)' },
+    porQue: 'Sin certificado no hay HTTPS con dominio propio. ACM valida la propiedad del dominio con un registro DNS en Route 53 y renueva solo. Para CloudFront, el certificado tiene que estar en us-east-1.',
+    siLoQuitas: 'CloudFront no puede presentar un certificado válido para cdn.miapp.com: el navegador muestra un error de certificado, o hay que volver al dominio xxxx.cloudfront.net que trae el certificado de AWS.',
+    cobro: { modos: ['sin-costo'], detalle: 'Los certificados públicos que solo se usan dentro de servicios integrados, como CloudFront o el ALB, no tienen costo.' },
+  },
+  {
+    id: 'waf',
+    nombre: 'AWS WAF',
+    queEs: 'Firewall de aplicaciones web: filtra peticiones HTTP(S) con reglas de capa 7 antes de que lleguen al origen.',
+    modulo: { href: '/servicios/cloudfront', etiqueta: 'M7 Entrega de contenido · nivel 3, La seguridad que ya viene incluida' },
+    porQue: 'Security Groups y NACL filtran por IP y puerto; no entienden HTTP. WAF bloquea patrones como inyección SQL, limita la tasa de peticiones por IP y filtra por reputación, y al estar asociado a CloudFront corta el ataque en el borde.',
+    siLoQuitas: 'Las peticiones maliciosas de capa 7 (inyección SQL, scraping, fuerza bruta contra un login en /api/*) llegan hasta el ALB y las instancias; solo las detendría el código de la aplicación, y se pagaría el cómputo de atenderlas.',
+    cobro: { modos: ['fijo-mensual', 'por-uso'], detalle: 'Cargo mensual por cada web ACL y por cada regla, más un cargo por cantidad de peticiones evaluadas.' },
+  },
+  {
+    id: 'shield',
+    nombre: 'AWS Shield Standard',
+    queEs: 'Protección contra DDoS de capas 3 y 4, activa automáticamente y sin configuración en CloudFront y Route 53.',
+    modulo: { href: '/servicios/cloudfront', etiqueta: 'M7 Entrega de contenido · nivel 3, La seguridad que ya viene incluida' },
+    porQue: 'Absorbe ataques volumétricos y de protocolo (inundaciones SYN, reflexión UDP) en la red de AWS. Es parte del motivo para poner CloudFront adelante: el ataque choca contra muchas edge locations y no contra tu VPC.',
+    siLoQuitas: 'Shield Standard no se puede desactivar. Lo que sí se pierde si sacás CloudFront del frente es la absorción en el borde: el tráfico del ataque llega concentrado al ALB de una sola región.',
+    cobro: { modos: ['sin-costo'], detalle: 'Shield Standard está incluido sin costo. Shield Advanced, que no forma parte de esta arquitectura, es una suscripción paga.' },
+  },
+  {
+    id: 's3',
+    nombre: 'Bucket S3 privado (con OAC)',
+    queEs: 'Bucket privado que guarda los archivos de /static/* (HTML, CSS, JS, imágenes), con versionado y reglas de ciclo de vida.',
+    modulo: { href: '/servicios/cloudfront', etiqueta: 'M7 Entrega de contenido · nivel 2 (OAC) y nivel 3, El bucket con versionado y ciclo de vida' },
+    porQue: 'Almacenamiento durable y barato para archivos que no necesitan servidor. Con OAC solo esta distribución de CloudFront puede leerlo; el versionado protege contra sobrescrituras y borrados accidentales, y el ciclo de vida expira o mueve versiones viejas para contener el costo.',
+    siLoQuitas: 'Los estáticos tendrían que servirse desde las EC2, gastando CPU y ancho de banda en algo que no requiere cómputo. Y sin OAC, el bucket tendría que ser público: cualquiera podría pedir los objetos directo a S3, saltándose CloudFront y WAF.',
+    cobro: { modos: ['por-uso'], detalle: 'Por GB almacenado al mes (según la clase de almacenamiento), por peticiones y por transferencia. Con versionado, cada versión conservada ocupa espacio facturable. La transferencia de S3 hacia CloudFront no se cobra.' },
+  },
+  {
+    id: 'internet-gateway',
+    nombre: 'Internet Gateway',
+    queEs: 'Componente de la VPC que conecta sus subredes públicas con Internet, en ambos sentidos.',
+    modulo: { href: '/servicios/vpc', etiqueta: 'M3 Amazon VPC' },
+    porQue: 'Por acá entran las peticiones /api/* que CloudFront reenvía al ALB, y por acá salen, a través de los NAT Gateway, las conexiones que inician las instancias privadas. Una subred es pública justamente porque su tabla de rutas tiene 0.0.0.0/0 hacia el IGW.',
+    siLoQuitas: 'La VPC queda aislada: CloudFront no alcanza al ALB y /api/* responde con error, y los NAT Gateway pierden su salida. El contenido estático seguiría funcionando, porque CloudFront y S3 no pasan por la VPC.',
+    cobro: { modos: ['sin-costo'], detalle: 'El IGW no tiene cargo propio; se paga la transferencia de datos de salida y las direcciones IPv4 públicas asociadas a recursos.' },
+  },
+  {
+    id: 'vpc',
+    nombre: 'Amazon VPC',
+    queEs: 'La red privada y aislada de la región, con el bloque 10.0.0.0/16, donde viven ALB, NAT, instancias y base de datos.',
+    modulo: { href: '/servicios/vpc', etiqueta: 'M3 Amazon VPC' },
+    porQue: 'Define el perímetro: qué es público, qué es privado y cómo se enruta. Un /16 deja espacio para agregar subredes más adelante (por ejemplo, una capa de datos separada) sin rediseñar.',
+    siLoQuitas: 'No hay dónde lanzar el ALB, las EC2 ni RDS: todos necesitan subredes de una VPC. Sin un diseño propio se usaría la VPC por defecto, cuyas subredes son todas públicas.',
+    cobro: { modos: ['sin-costo'], detalle: 'La VPC en sí no se cobra; sí cobran componentes dentro de ella, como NAT Gateway, IP públicas, endpoints y la transferencia entre AZ.' },
+  },
+  {
+    id: 'zona-disponibilidad',
+    nombre: 'Zona de disponibilidad (AZ)',
+    queEs: 'Uno o más centros de datos aislados dentro de la región; esta arquitectura usa us-east-1a y us-east-1b.',
+    modulo: { href: '/servicios/vpc', etiqueta: 'M3 Amazon VPC' },
+    porQue: 'Repetir el mismo patrón en dos AZ elimina el punto único de fallo físico: si una zona cae, la otra sigue sirviendo, porque el ALB, el ASG y RDS Multi-AZ saben usar la sobreviviente.',
+    siLoQuitas: 'Con una sola AZ, un corte de energía o de red en esa zona tumba todo el sistema a la vez. Además, el ALB exige subredes en al menos dos AZ.',
+    cobro: { modos: ['sin-costo'], detalle: 'Usar varias AZ no se cobra por sí mismo, pero la transferencia de datos entre AZ sí tiene cargo (por ejemplo, una instancia que sale por el NAT de la otra zona).' },
+  },
+  {
+    id: 'subred-publica',
+    nombre: 'Subredes públicas',
+    queEs: 'Las subredes 10.0.1.0/24 (us-east-1a) y 10.0.2.0/24 (us-east-1b), cuya tabla de rutas envía 0.0.0.0/0 al Internet Gateway.',
+    modulo: { href: '/servicios/vpc', etiqueta: 'M3 Amazon VPC' },
+    porQue: 'Alojan solo lo que tiene que ser alcanzable desde Internet o salir directo a él: los nodos del ALB y los NAT Gateway. Nada de la aplicación ni de los datos vive acá.',
+    siLoQuitas: 'El ALB no tendría dónde recibir el tráfico de CloudFront y los NAT Gateway no podrían existir, porque necesitan una subred con ruta al IGW: la aplicación quedaría inalcanzable y sin salida.',
+    cobro: { modos: ['sin-costo'], detalle: 'Las subredes no tienen costo; se paga lo que se lanza dentro de ellas.' },
+  },
+  {
+    id: 'subred-privada',
+    nombre: 'Subredes privadas',
+    queEs: 'Las subredes 10.0.11.0/24 (us-east-1a) y 10.0.12.0/24 (us-east-1b), sin ruta al IGW: su 0.0.0.0/0 apunta al NAT Gateway de su misma AZ.',
+    modulo: { href: '/servicios/vpc', etiqueta: 'M3 Amazon VPC' },
+    porQue: 'Las instancias y la base de datos no son alcanzables desde Internet ni aunque un Security Group quede mal configurado: solo reciben lo que el ALB les reenvía y salen por el NAT.',
+    siLoQuitas: 'Habría que poner las EC2 y RDS en subredes públicas: con IP pública quedan expuestas a escaneos directos y la única defensa pasa a ser el Security Group.',
+    cobro: { modos: ['sin-costo'], detalle: 'Las subredes no tienen costo; se paga lo que se lanza dentro de ellas.' },
+  },
+  {
+    id: 'alb',
+    nombre: 'Application Load Balancer (ALB)',
+    queEs: 'Un único balanceador de capa 7 con nodos en las dos subredes públicas; es el origen de /api/* para CloudFront.',
+    modulo: { href: '/guia-arquitectura#alb-target-groups', etiqueta: 'Guía de arquitectura · 05 ALB y Target Groups (y M6 Elasticidad)' },
+    porQue: 'Da un punto estable delante de instancias que el ASG crea y destruye, reparte la carga entre las dos AZ y solo envía tráfico a destinos que pasan el health check.',
+    siLoQuitas: 'CloudFront tendría que apuntar a una instancia concreta: sin reparto de carga, sin retirar instancias rotas y con una dirección que cambia cada vez que el ASG reemplaza una máquina. Además, las EC2 tendrían que estar en una subred pública.',
+    cobro: { modos: ['fijo-por-hora', 'por-uso'], detalle: 'Cargo por cada hora (o fracción) que el balanceador existe, más un cargo por capacidad consumida (LCU) según conexiones, peticiones y bytes procesados.' },
+  },
+  {
+    id: 'target-group',
+    nombre: 'Target Group',
+    queEs: 'Grupo de destinos (las instancias EC2) al que el ALB reenvía, con su health check, por ejemplo HTTP:80 en /health.',
+    modulo: { href: '/guia-arquitectura#alb-target-groups', etiqueta: 'Guía de arquitectura · 05 ALB y Target Groups (y M6 Elasticidad, nivel 3)' },
+    porQue: 'Separa quién recibe tráfico de cómo se reparte: el ASG registra y desregistra instancias acá automáticamente y el health check decide cuáles están listas para recibir usuarios.',
+    siLoQuitas: 'El listener del ALB no tiene a quién reenviar las peticiones. Y sin un health check que diga la verdad, el ALB seguiría enviando usuarios a instancias que responden pero no pueden trabajar.',
+    cobro: { modos: ['sin-costo'], detalle: 'No tiene cargo propio: su uso está incluido en el costo del ALB.' },
+  },
+  {
+    id: 'nat-gateway',
+    nombre: 'NAT Gateway',
+    queEs: 'Servicio administrado que deja a las instancias privadas iniciar conexiones hacia Internet sin aceptar conexiones entrantes; hay uno por AZ.',
+    modulo: { href: '/servicios/vpc', etiqueta: 'M3 Amazon VPC · nivel 4' },
+    porQue: 'Las EC2 necesitan descargar parches (dnf update) y paquetes, y llamar a APIs externas, sin ser alcanzables desde afuera. Tener uno por AZ evita que la caída de una zona corte la salida de la otra y evita tráfico entre AZ.',
+    siLoQuitas: 'Sin el NAT Gateway, las instancias privadas no pueden descargar actualizaciones ni llamar a APIs externas, aunque siguen atendiendo las peticiones que llegan desde el ALB. Con uno solo compartido, su AZ se vuelve punto único de fallo para la salida de toda la VPC.',
+    cobro: { modos: ['fijo-por-hora', 'por-uso'], detalle: 'Cargo por cada hora que existe más un cargo por GB procesado. Con uno por AZ, el costo fijo se duplica: suele ser uno de los rubros más caros de esta arquitectura.' },
+  },
+  {
+    id: 'auto-scaling-group',
+    nombre: 'Auto Scaling Group (ASG)',
+    queEs: 'Grupo que mantiene entre un mínimo y un máximo de instancias EC2, repartidas en las dos subredes privadas, a partir de un Launch Template.',
+    modulo: { href: '/servicios/elasticidad', etiqueta: 'M6 Elasticidad · nivel 3, El ASG sobre dos AZ' },
+    porQue: 'Reemplaza solo las instancias que fallan (con verificación de salud ELB) y ajusta la capacidad según una métrica de CloudWatch, por ejemplo CPU promedio al 60 %. Reparte las instancias entre AZ.',
+    siLoQuitas: 'Una instancia caída queda caída hasta que alguien la reemplace a mano, y un pico de carga satura las que hay. Si cae una AZ, nadie lanza capacidad en la otra.',
+    cobro: { modos: ['sin-costo'], detalle: 'Auto Scaling no se cobra; se pagan las instancias EC2 y las alarmas de CloudWatch que usa.' },
+  },
+  {
+    id: 'ec2',
+    nombre: 'Instancias Amazon EC2',
+    queEs: 'Servidores virtuales que ejecutan la aplicación de /api/*, al menos uno por AZ, dentro de las subredes privadas.',
+    modulo: { href: '/servicios/ec2', etiqueta: 'M4 Amazon EC2 (y M6 Elasticidad)' },
+    porQue: 'Es la capa de cómputo de la lógica dinámica. En subred privada, sin IP pública y creadas por el ASG desde una AMI, son reemplazables: ganado, no mascotas.',
+    siLoQuitas: 'Nadie procesa /api/*: el ALB no tiene destinos registrados y responde con error. El contenido estático servido por CloudFront y S3 seguiría funcionando.',
+    cobro: { modos: ['fijo-por-hora'], detalle: 'On-Demand se cobra por tiempo encendida según el tipo de instancia (por segundo en Linux, con un mínimo de 60 segundos). Savings Plans o Spot cambian la tarifa, no el modelo.' },
+  },
+  {
+    id: 'rol-iam',
+    nombre: 'Rol IAM de la instancia',
+    queEs: 'Rol que cada instancia asume mediante su perfil de instancia para obtener credenciales temporales de AWS.',
+    modulo: { href: '/servicios/iam', etiqueta: 'M5 Protección del acceso (IAM) · nivel 2, El caso mínimo de un rol' },
+    porQue: 'La aplicación puede llamar a servicios de AWS, por ejemplo leer de S3 o publicar métricas en CloudWatch, sin guardar access keys en el disco ni en el código: las credenciales rotan solas. El Launch Template lo asigna a cada instancia que lanza el ASG.',
+    siLoQuitas: 'Las llamadas de la aplicación a AWS fallan por falta de credenciales o con AccessDenied, o alguien termina copiando access keys de larga duración en la AMI, que es justo el error que el rol evita.',
+    cobro: { modos: ['sin-costo'], detalle: 'IAM no tiene costo.' },
+  },
+  {
+    id: 'ebs',
+    nombre: 'Volúmenes Amazon EBS',
+    queEs: 'Disco de bloques persistente conectado a cada instancia como volumen raíz (y, si hace falta, como disco adicional).',
+    modulo: { href: '/servicios/ec2', etiqueta: 'M4 Amazon EC2 (y Guía de arquitectura · 04 EBS y snapshots)' },
+    porQue: 'Guarda el sistema operativo y la aplicación. En esta arquitectura se trata como descartable: el estado importante vive en RDS o S3, porque el ASG termina instancias y, por defecto, el volumen raíz se borra con ellas.',
+    siLoQuitas: 'Una instancia basada en EBS no arranca sin volumen raíz. Y cualquier dato de usuario guardado solo en EBS se pierde cuando el ASG termina la instancia.',
+    cobro: { modos: ['por-uso'], detalle: 'Por GB aprovisionado al mes (no por GB ocupado), aunque la instancia esté detenida; algunos tipos cobran además IOPS o rendimiento, y los snapshots se cobran por GB almacenado.' },
+  },
+  {
+    id: 'rds',
+    nombre: 'Amazon RDS Multi-AZ',
+    queEs: 'Base de datos relacional administrada: una instancia primaria en us-east-1a y una standby sincrónica en us-east-1b.',
+    modulo: {
+      href: '/servicios/ec2',
+      etiqueta: 'M4 Amazon EC2 · nivel 3, La arquitectura de alta disponibilidad estándar',
+      nota: 'RDS no tiene un módulo dedicado en esta app todavía. El nivel 3 de EC2 lo ubica en la arquitectura de alta disponibilidad, y el nivel 4 de Elasticidad explica por qué el estado va en RDS y no en la instancia.',
+    },
+    porQue: 'Saca el estado de las instancias (se pueden destruir sin perder datos) y delega backups, parches y failover en AWS. En el despliegue Multi-AZ con una standby, la réplica sincrónica de la otra AZ se promueve si la primaria falla; esa standby no atiende lecturas.',
+    siLoQuitas: 'Los datos quedarían en las EC2 o sus volúmenes EBS: se pierden cuando el ASG termina una instancia y no se comparten entre instancias. Sin Multi-AZ, la caída de us-east-1a deja la aplicación sin base de datos hasta restaurar un backup.',
+    cobro: { modos: ['fijo-por-hora', 'por-uso'], detalle: 'Por hora de instancia de base de datos (Multi-AZ paga también la standby), más almacenamiento por GB al mes y backups por encima del tamaño de la base.' },
+  },
+  {
+    id: 'security-groups',
+    nombre: 'Security Groups',
+    queEs: 'Firewalls stateful a nivel de interfaz: sg-alb, sg-app y sg-db, encadenados haciendo referencia uno al otro.',
+    modulo: { href: '/guia-arquitectura#security-groups', etiqueta: 'Guía de arquitectura · 03 Security Groups (y M3 Amazon VPC)' },
+    porQue: 'Cada capa acepta solo a la anterior: el ALB recibe HTTPS (idealmente solo desde la prefix list administrada de CloudFront), las EC2 solo desde el SG del ALB y RDS solo el puerto del motor desde el SG de las EC2. Referenciar SG en vez de IP sigue funcionando cuando el ASG cambia las instancias.',
+    siLoQuitas: 'Sin reglas específicas se cae en uno de dos extremos: nada se conecta (un SG sin reglas de entrada bloquea todo) o se abre 0.0.0.0/0 para que funcione, y la base de datos queda alcanzable desde cualquier recurso con ruta hacia ella.',
+    cobro: { modos: ['sin-costo'], detalle: 'Los Security Groups no tienen costo.' },
+  },
+  {
+    id: 'tablas-rutas',
+    nombre: 'Tablas de rutas',
+    queEs: 'Reglas que deciden a dónde va el tráfico que sale de cada subred; si varias coinciden, gana el prefijo más largo.',
+    modulo: { href: '/servicios/vpc', etiqueta: 'M3 Amazon VPC (y su simulador de tablas de rutas)' },
+    porQue: 'Son las que hacen pública o privada a una subred: la pública tiene 0.0.0.0/0 hacia el IGW y cada privada tiene 0.0.0.0/0 hacia el NAT de su misma AZ. La ruta local 10.0.0.0/16 permite que todo se comunique dentro de la VPC.',
+    siLoQuitas: 'Las subredes quedan con la tabla principal, que en esta VPC solo tiene la ruta local: el ALB deja de ser alcanzable desde Internet y las instancias pierden la salida por NAT.',
+    cobro: { modos: ['sin-costo'], detalle: 'Las tablas de rutas no tienen costo.' },
+  },
+  {
+    id: 'cloudwatch',
+    nombre: 'Amazon CloudWatch',
+    queEs: 'Servicio de métricas, logs y alarmas: recibe la CPU de las EC2 y las métricas del ALB, y dispara el escalado.',
+    modulo: { href: '/servicios/elasticidad', etiqueta: 'M6 Elasticidad · nivel 3, CloudWatch: lo que mide y lo que no' },
+    porQue: 'La política de target tracking del ASG crea alarmas de CloudWatch sobre la CPU promedio del grupo; sin métricas no hay escalado automático ni visibilidad de errores 5xx o de latencia.',
+    siLoQuitas: 'El ASG podría mantener un número fijo de instancias (y seguir reemplazando las que fallan el health check), pero no escalaría con la carga, y nadie se enteraría de un aumento de errores hasta que lo reporten los usuarios.',
+    cobro: { modos: ['por-uso'], detalle: 'Las métricas básicas de EC2 (cada 5 minutos) no se cobran; sí se cobran el monitoreo detallado, las métricas personalizadas, las alarmas y los logs ingeridos y almacenados.' },
+  },
 ]
 
-export function idArista({ de, a }: Pick<Arista, 'de' | 'a'>): string {
-  return `${de}->${a}`
+const COMPONENTES_POR_ID = new Map(COMPONENTES.map((componente) => [componente.id, componente]))
+
+export function getComponente(id: ComponenteId): Componente {
+  return COMPONENTES_POR_ID.get(id)!
 }
 
-// ─── Variantes · Mínima / Intermedia / Completa ──────────────────────────────
+// ---------------------------------------------------------------------------
+// Diagram nodes
+// ---------------------------------------------------------------------------
 
-/** A node moved to another place of the diagram in a simpler variant (Mínima puts the EC2 in the public subnet). */
-type Reubicacion = { x: number; y: number; capa: Capa; detalle: string; grupo: string }
+export type NodoId =
+  | 'route53' | 'cloudfront' | 'acm' | 'waf' | 'shield' | 's3' | 'cloudwatch'
+  | 'internet-gateway' | 'vpc' | 'az-a' | 'az-b'
+  | 'subred-publica-a' | 'subred-publica-b' | 'subred-privada-a' | 'subred-privada-b'
+  | 'alb-a' | 'alb-b' | 'nat-a' | 'nat-b' | 'target-group' | 'asg'
+  | 'ec2-a' | 'ec2-b' | 'rol-a' | 'rol-b' | 'ebs-a' | 'ebs-b'
+  | 'rds-primaria' | 'rds-standby' | 'security-groups' | 'tablas-rutas'
 
-export type Variante = {
-  id: VarianteId
+export type Nodo = {
+  id: NodoId
+  componente: ComponenteId
+  label: string
+  /** Short technical detail shown under the label (CIDR, AZ, config). */
+  detalle: string
+  capa: Capa
+}
+
+export const NODOS: Nodo[] = [
+  { id: 'route53', componente: 'route53', label: 'Route 53', detalle: 'cdn.miapp.com → ALIAS', capa: 'borde' },
+  { id: 'cloudfront', componente: 'cloudfront', label: 'CloudFront', detalle: '/static/* y /api/*', capa: 'borde' },
+  { id: 'acm', componente: 'acm', label: 'ACM', detalle: 'certificado TLS', capa: 'borde' },
+  { id: 'waf', componente: 'waf', label: 'WAF', detalle: 'reglas capa 7', capa: 'borde' },
+  { id: 'shield', componente: 'shield', label: 'Shield Standard', detalle: 'DDoS capas 3 y 4', capa: 'borde' },
+  { id: 's3', componente: 's3', label: 'Bucket S3', detalle: 'privado · OAC · versionado', capa: 'borde' },
+  { id: 'internet-gateway', componente: 'internet-gateway', label: 'Internet Gateway', detalle: 'entrada y salida de la VPC', capa: 'publica' },
+  { id: 'subred-publica-a', componente: 'subred-publica', label: 'Subred pública', detalle: '10.0.1.0/24', capa: 'publica' },
+  { id: 'alb-a', componente: 'alb', label: 'ALB', detalle: 'nodo en us-east-1a', capa: 'publica' },
+  { id: 'nat-a', componente: 'nat-gateway', label: 'NAT Gateway', detalle: 'us-east-1a', capa: 'publica' },
+  { id: 'subred-publica-b', componente: 'subred-publica', label: 'Subred pública', detalle: '10.0.2.0/24', capa: 'publica' },
+  { id: 'alb-b', componente: 'alb', label: 'ALB', detalle: 'nodo en us-east-1b', capa: 'publica' },
+  { id: 'nat-b', componente: 'nat-gateway', label: 'NAT Gateway', detalle: 'us-east-1b', capa: 'publica' },
+  { id: 'target-group', componente: 'target-group', label: 'Target Group', detalle: 'HTTP:80 · /health', capa: 'privada' },
+  { id: 'asg', componente: 'auto-scaling-group', label: 'Auto Scaling Group', detalle: 'mín 2 · máx 6 · dos AZ', capa: 'privada' },
+  { id: 'subred-privada-a', componente: 'subred-privada', label: 'Subred privada', detalle: '10.0.11.0/24', capa: 'privada' },
+  { id: 'ec2-a', componente: 'ec2', label: 'EC2', detalle: 'us-east-1a', capa: 'privada' },
+  { id: 'rol-a', componente: 'rol-iam', label: 'Rol IAM', detalle: 'perfil de instancia', capa: 'privada' },
+  { id: 'subred-privada-b', componente: 'subred-privada', label: 'Subred privada', detalle: '10.0.12.0/24', capa: 'privada' },
+  { id: 'ec2-b', componente: 'ec2', label: 'EC2', detalle: 'us-east-1b', capa: 'privada' },
+  { id: 'rol-b', componente: 'rol-iam', label: 'Rol IAM', detalle: 'perfil de instancia', capa: 'privada' },
+  { id: 'ebs-a', componente: 'ebs', label: 'EBS', detalle: 'volumen raíz · us-east-1a', capa: 'datos' },
+  { id: 'ebs-b', componente: 'ebs', label: 'EBS', detalle: 'volumen raíz · us-east-1b', capa: 'datos' },
+  { id: 'rds-primaria', componente: 'rds', label: 'RDS primaria', detalle: 'us-east-1a', capa: 'datos' },
+  { id: 'rds-standby', componente: 'rds', label: 'RDS standby', detalle: 'us-east-1b', capa: 'datos' },
+  { id: 'vpc', componente: 'vpc', label: 'VPC', detalle: '10.0.0.0/16', capa: 'transversal' },
+  { id: 'az-a', componente: 'zona-disponibilidad', label: 'AZ', detalle: 'us-east-1a', capa: 'transversal' },
+  { id: 'az-b', componente: 'zona-disponibilidad', label: 'AZ', detalle: 'us-east-1b', capa: 'transversal' },
+  { id: 'security-groups', componente: 'security-groups', label: 'Security Groups', detalle: 'sg-alb → sg-app → sg-db', capa: 'transversal' },
+  { id: 'tablas-rutas', componente: 'tablas-rutas', label: 'Tablas de rutas', detalle: 'pública → IGW · privada → NAT', capa: 'transversal' },
+  { id: 'cloudwatch', componente: 'cloudwatch', label: 'CloudWatch', detalle: 'métricas y alarmas', capa: 'transversal' },
+]
+
+const NODOS_POR_ID = new Map(NODOS.map((nodo) => [nodo.id, nodo]))
+
+export function getNodo(id: NodoId): Nodo {
+  return NODOS_POR_ID.get(id)!
+}
+
+export type CapaApilada = {
+  capa: Capa
   titulo: string
   descripcion: string
-  nodos: NodoId[]
-  reubicados: Partial<Record<NodoId, Reubicacion>>
-  /** Against the previous (simpler) variant; null for Mínima. */
-  frenteAnterior: { gana: string[]; cuestaMas: string[] } | null
-  leFalta: string[]
+  grupos: { titulo?: string; nodos: NodoId[] }[]
 }
 
-const SIN_BORDE = new Set<NodoId>(['route53', 'cloudfront', 'acm', 'waf', 'shield', 's3'])
-
-export const VARIANTES: Variante[] = [
+/** Narrow-screen layout: one card per layer, edge → public → private → data, then cross-cutting pieces. */
+export const CAPAS_APILADAS: CapaApilada[] = [
   {
-    id: 'minima', titulo: 'Mínima',
-    descripcion: 'Una sola EC2 con IP pública en una subred pública. Sin alta disponibilidad, sin CDN y sin capa privada.',
-    nodos: ['vpc', 'internet-gateway', 'az-a', 'subred-publica-a', 'ec2-a', 'ebs-a', 'tablas-rutas', 'security-groups', 'rol-iam'],
-    reubicados: {
-      'ec2-a': { x: 72, y: 388, capa: 'publica', detalle: 'IP pública', grupo: 'us-east-1a' },
-      'ebs-a': { x: 266, y: 388, capa: 'datos', detalle: 'disco de 1a', grupo: 'Discos de las instancias' },
-    },
-    frenteAnterior: null,
-    leFalta: [
-      'Si la instancia o la zona us-east-1a fallan, el sitio se cae: no hay otra instancia ni otra AZ.',
-      'La instancia está expuesta directamente a Internet y su Security Group es la barrera principal: la NACL por defecto permite todo.',
-      'No escala: con más tráfico la única instancia se satura en lugar de sumar capacidad.',
-      'Sin dominio propio ni certificado: se entra por la IP pública, que cambia en cada stop/start salvo que se use una Elastic IP.',
-      'Los datos viven en el disco EBS de esa única instancia.',
+    capa: 'borde', titulo: 'Borde global', descripcion: 'Fuera de la VPC: DNS, CDN, certificado, filtros y el bucket de estáticos.',
+    grupos: [{ nodos: ['route53', 'cloudfront', 'acm', 'waf', 'shield', 's3'] }],
+  },
+  {
+    capa: 'publica', titulo: 'Red pública', descripcion: 'Subredes con ruta al Internet Gateway. Solo el ALB y los NAT Gateway.',
+    grupos: [
+      { nodos: ['internet-gateway'] },
+      { titulo: 'us-east-1a', nodos: ['subred-publica-a', 'alb-a', 'nat-a'] },
+      { titulo: 'us-east-1b', nodos: ['subred-publica-b', 'alb-b', 'nat-b'] },
     ],
   },
   {
-    id: 'intermedia', titulo: 'Intermedia',
-    descripcion: 'ALB, dos AZ, Auto Scaling Group, subredes privadas, NAT Gateway y RDS Multi-AZ. Sin CDN ni certificado propio.',
-    nodos: NODOS.map(({ id }) => id).filter((id) => !SIN_BORDE.has(id)),
-    reubicados: {},
-    frenteAnterior: {
-      gana: [
-        'Alta disponibilidad: un nodo del ALB en cada AZ y un Auto Scaling Group que reemplaza las instancias caídas.',
-        'La aplicación y la base de datos pasan a subredes privadas, sin IP pública: solo el ALB recibe tráfico de Internet.',
-        'Las instancias privadas siguen saliendo a Internet por un NAT Gateway en cada AZ.',
-        'Escala con la carga gracias al ASG y a las alarmas de CloudWatch.',
-        'Los datos pasan a RDS Multi-AZ y sobreviven a la instancia que los procesó.',
-      ],
-      cuestaMas: [
-        'Dos NAT Gateway que cobran por hora aunque no haya tráfico, más cada GB procesado.',
-        'El ALB cobra por cada hora que existe más la capacidad consumida.',
-        'Al menos dos EC2 encendidas y una standby de RDS que también se paga.',
-        'Tráfico entre AZ, por ejemplo de la EC2 de us-east-1b a la RDS primaria de us-east-1a.',
-      ],
-    },
-    leFalta: [
-      'Todo el tráfico, también imágenes y CSS, llega hasta el ALB y las EC2: no hay caché en el borde.',
-      'Sin dominio propio ni certificado de ACM: se entra por el nombre DNS del ALB y el sitio no se sirve por HTTPS.',
-      'Sin WAF: las peticiones maliciosas bien formadas llegan hasta la aplicación.',
+    capa: 'privada', titulo: 'Red privada', descripcion: 'Sin ruta al IGW. Las instancias salen por el NAT de su AZ.',
+    grupos: [
+      { nodos: ['target-group', 'asg'] },
+      { titulo: 'us-east-1a', nodos: ['subred-privada-a', 'ec2-a', 'rol-a'] },
+      { titulo: 'us-east-1b', nodos: ['subred-privada-b', 'ec2-b', 'rol-b'] },
     ],
   },
   {
-    id: 'completa', titulo: 'Completa',
-    descripcion: 'Todo el diagrama: la Intermedia más Route 53, CloudFront, ACM, WAF, Shield y un bucket S3 privado con OAC.',
-    nodos: NODOS.map(({ id }) => id),
-    reubicados: {},
-    frenteAnterior: {
-      gana: [
-        'CloudFront cachea lo estático en el borde: menos latencia y menos carga en el origen, así que el ASG escala mucho menos.',
-        'Dominio propio con Route 53 y HTTPS en los dos tramos con certificados de ACM.',
-        'WAF y Shield Standard filtran en el borde antes de que el tráfico llegue a la VPC.',
-        'Los estáticos viven en un bucket S3 privado que solo CloudFront puede leer mediante OAC.',
-      ],
-      cuestaMas: [
-        'CloudFront cobra por datos transferidos hacia Internet y por número de peticiones.',
-        'WAF cobra por cada web ACL, por cada regla y por las peticiones inspeccionadas.',
-        'S3 cobra almacenamiento, peticiones y cada versión guardada.',
-        'Route 53 cobra la zona alojada y las consultas; las consultas ALIAS hacia recursos de AWS no se cobran.',
-      ],
-    },
-    leFalta: [
-      'Sigue en una sola región: una falla regional la deja fuera de servicio. La recuperación entre regiones queda fuera de este diagrama.',
+    capa: 'datos', titulo: 'Datos', descripcion: 'Donde vive el estado: base de datos y discos de las instancias.',
+    grupos: [
+      { titulo: 'us-east-1a', nodos: ['rds-primaria', 'ebs-a'] },
+      { titulo: 'us-east-1b', nodos: ['rds-standby', 'ebs-b'] },
     ],
+  },
+  {
+    capa: 'transversal', titulo: 'Transversal', descripcion: 'Piezas que abarcan varias capas: la red, sus zonas, el control de acceso y la observabilidad.',
+    grupos: [{ nodos: ['vpc', 'az-a', 'az-b', 'security-groups', 'tablas-rutas', 'cloudwatch'] }],
   },
 ]
 
-const VARIANTES_POR_ID = new Map(VARIANTES.map((variante) => [variante.id, variante]))
+// ---------------------------------------------------------------------------
+// Modo 1 · Flujo de tráfico
+// ---------------------------------------------------------------------------
 
-export function getVariante(id: VarianteId): Variante {
-  const variante = VARIANTES_POR_ID.get(id)
-  if (!variante) throw new Error(`Variante desconocida: ${id}`)
-  return variante
+export type ActorId = NodoId | 'usuario'
+
+export type PasoTrafico = {
+  actor: ActorId
+  /** Other nodes taking part in the step (highlighted less strongly). */
+  involucrados?: NodoId[]
+  accion: string
+  decision: string
 }
 
-/** Nodes of a variant in NODOS order, with the relocations of simpler variants applied. */
-export function nodosDeVariante(id: VarianteId): Nodo[] {
-  const variante = getVariante(id)
-  const presentes = new Set(variante.nodos)
-  return NODOS.filter((nodo) => presentes.has(nodo.id)).map((nodo) => {
-    const reubicado = variante.reubicados[nodo.id]
-    if (!reubicado) return nodo
-    return { ...nodo, x: reubicado.x, y: reubicado.y, capa: reubicado.capa, detalle: reubicado.detalle }
-  })
-}
+export type RutaTraficoId = 'estatico-hit' | 'estatico-miss' | 'dinamico'
 
-export function aristasDeVariante(id: VarianteId): Arista[] {
-  const presentes = new Set<Actor>([...getVariante(id).nodos, 'usuario'])
-  return ARISTAS.filter((arista) => (!arista.variantes || arista.variantes.includes(id)) && presentes.has(arista.de) && presentes.has(arista.a))
-}
+export type RutaTrafico = { id: RutaTraficoId; label: string; descripcion: string; pasos: PasoTrafico[] }
 
-export function capasApiladasDe(id: VarianteId): CapaApilada[] {
-  const variante = getVariante(id)
-  const presentes = new Set(variante.nodos)
-  const reubicados = Object.entries(variante.reubicados) as [NodoId, Reubicacion][]
-  return CAPAS_APILADAS.map((capa) => {
-    // Relocated nodes leave their original group and join their destination group.
-    const grupos = capa.grupos.map((grupo) => ({
-      titulo: grupo.titulo,
-      nodos: grupo.nodos.filter((nodo) => presentes.has(nodo) && !variante.reubicados[nodo]),
-    }))
-    for (const [nodo, destino] of reubicados) {
-      if (destino.capa !== capa.capa || !presentes.has(nodo)) continue
-      const grupo = grupos.find(({ titulo }) => titulo === destino.grupo)
-      if (grupo) grupo.nodos.push(nodo)
-      else grupos.push({ titulo: destino.grupo, nodos: [nodo] })
-    }
-    return { ...capa, grupos: grupos.filter(({ nodos }) => nodos.length > 0) }
-  }).filter(({ grupos }) => grupos.length > 0)
-}
+const PASOS_BORDE = (recurso: string): PasoTrafico[] => [
+  { actor: 'usuario', accion: `El navegador pide https://cdn.miapp.com${recurso}.`, decision: 'Antes de conectarse necesita la dirección del nombre cdn.miapp.com.' },
+  { actor: 'route53', accion: 'Responde la consulta DNS del registro ALIAS.', decision: 'Resuelve el ALIAS hacia la distribución de CloudFront, que responde con direcciones de una edge location cercana al usuario.' },
+  { actor: 'cloudfront', involucrados: ['acm', 'shield'], accion: 'La edge location acepta la conexión HTTPS presentando el certificado de ACM.', decision: 'Si la petición llegó por HTTP, la redirige a HTTPS. Shield Standard ya filtra ataques de capas 3 y 4 en este punto.' },
+  { actor: 'waf', accion: 'Evalúa la petición contra las reglas de la web ACL.', decision: 'Permitir: no coincide con patrones de inyección ni supera el límite de tasa. Si coincidiera, CloudFront respondería 403 sin tocar el origen.' },
+]
 
-function componentesDeVariante(id: VarianteId): Set<ComponenteId> {
-  return new Set(nodosDeVariante(id).map(({ componente }) => componente))
-}
-
-/** Components a variant adds or drops against another, in COMPONENTES order. */
-export function diferenciaVariantes(desde: VarianteId, hasta: VarianteId): { agregados: ComponenteId[]; quitados: ComponenteId[] } {
-  const antes = componentesDeVariante(desde)
-  const despues = componentesDeVariante(hasta)
-  return {
-    agregados: COMPONENTES.map(({ id }) => id).filter((id) => despues.has(id) && !antes.has(id)),
-    quitados: COMPONENTES.map(({ id }) => id).filter((id) => antes.has(id) && !despues.has(id)),
-  }
-}
-
-/** Traffic (1) and high availability (3) are written step by step for the complete architecture. */
-export function varianteEfectiva(modo: ModoId, variante: VarianteId): VarianteId {
-  return modo === 'trafico' || modo === 'alta-disponibilidad' ? 'completa' : variante
-}
-
-// ─── Modo 1 · Flujo de tráfico ───────────────────────────────────────────────
-
-export type PasoTrafico = { actor: Actor; accion: string; decision: string; apoyos?: NodoId[] }
-export type RutaTrafico = { titulo: string; descripcion: string; pasos: PasoTrafico[] }
-
-const PASO_DNS: PasoTrafico = {
-  actor: 'route53',
-  accion: 'Resuelve cafeteria.com con el registro ALIAS que apunta a la distribución de CloudFront.',
-  decision: 'Devuelve direcciones de la red de CloudFront, así la conexión termina en una edge location cercana al usuario.',
-}
-
-export const RUTAS_TRAFICO: Record<RutaId, RutaTrafico> = {
+export const RUTAS_TRAFICO: Record<RutaTraficoId, RutaTrafico> = {
   'estatico-hit': {
-    titulo: 'Estático · cache hit',
-    descripcion: 'El navegador pide /css/estilos.v7.css y la edge location ya lo tiene.',
+    id: 'estatico-hit',
+    label: 'Estático · cache hit',
+    descripcion: 'Un archivo de /static/* que la edge location ya tiene en caché.',
     pasos: [
-      { actor: 'usuario', accion: 'El navegador pide https://cafeteria.com/css/estilos.v7.css.', decision: 'Antes de conectarse necesita resolver el nombre a una dirección.' },
-      PASO_DNS,
-      { actor: 'cloudfront', apoyos: ['acm', 'shield', 'waf'], accion: 'La edge location recibe la petición HTTPS con el certificado de ACM; WAF y Shield la filtran.', decision: 'El patrón /css/* va al origen S3 y el objeto está en caché con su TTL vigente: cache hit.' },
-      { actor: 'usuario', accion: 'Recibe el archivo directamente desde la edge location.', decision: 'La petición no tocó S3 ni la VPC: menos latencia y ninguna carga en el origen.' },
+      ...PASOS_BORDE('/static/app.css'),
+      { actor: 'cloudfront', accion: 'Compara la ruta con los comportamientos de caché.', decision: '/static/* coincide con el comportamiento estático y el objeto está en caché con el TTL vigente: cache hit, no hace falta ir al origen.' },
+      { actor: 'usuario', involucrados: ['cloudfront'], accion: 'Recibe el archivo directamente desde la edge location.', decision: 'Latencia mínima: ni S3 ni la VPC participaron en esta petición.' },
     ],
   },
   'estatico-miss': {
-    titulo: 'Estático · cache miss',
-    descripcion: 'La primera petición de /img/logo.v2.png en esa edge location.',
+    id: 'estatico-miss',
+    label: 'Estático · cache miss',
+    descripcion: 'Un archivo de /static/* que la edge location todavía no tiene: baja hasta S3.',
     pasos: [
-      { actor: 'usuario', accion: 'El navegador pide https://cafeteria.com/img/logo.v2.png.', decision: 'Antes de conectarse necesita resolver el nombre a una dirección.' },
-      PASO_DNS,
-      { actor: 'cloudfront', apoyos: ['acm', 'shield', 'waf'], accion: 'La edge location recibe la petición HTTPS y la filtra con WAF y Shield.', decision: 'El patrón /img/* va al origen S3, pero el objeto no está en caché o su TTL venció: cache miss.' },
-      { actor: 's3', accion: 'CloudFront pide el objeto al bucket privado con una petición firmada.', decision: 'La política del bucket solo acepta peticiones firmadas por OAC de esta distribución; el bucket sigue sin acceso público.' },
-      { actor: 'cloudfront', accion: 'Guarda una copia en la edge location y la devuelve al usuario.', decision: 'Con la política CachingOptimized, las próximas peticiones de ese archivo en esa edge serán cache hit.' },
-      { actor: 'usuario', accion: 'Recibe la imagen, un poco más tarde que en un cache hit.', decision: 'Solo el primer usuario de esa edge pagó el viaje hasta S3.' },
+      ...PASOS_BORDE('/static/app.css'),
+      { actor: 'cloudfront', accion: 'Compara la ruta con los comportamientos de caché.', decision: '/static/* coincide, pero el objeto no está en caché o su TTL venció: cache miss, hay que pedirlo al origen S3.' },
+      { actor: 's3', involucrados: ['cloudfront'], accion: 'Recibe una petición firmada por CloudFront.', decision: 'La bucket policy solo autoriza a esta distribución mediante OAC: la firma es válida y devuelve el objeto. Una petición directa al bucket recibiría 403.' },
+      { actor: 'cloudfront', accion: 'Guarda el objeto en la caché de la edge location.', decision: 'Lo conserva según el TTL del comportamiento: las próximas peticiones de usuarios cercanos serán cache hit.' },
+      { actor: 'usuario', involucrados: ['cloudfront'], accion: 'Recibe el archivo.', decision: 'Esta primera petición tardó más que un hit porque viajó hasta el bucket en us-east-1.' },
     ],
   },
   dinamico: {
-    titulo: 'Dinámico · /api/',
-    descripcion: 'El navegador pide /api/pedidos, una respuesta distinta para cada usuario.',
+    id: 'dinamico',
+    label: 'Dinámico · /api/*',
+    descripcion: 'Una llamada a la API: atraviesa la VPC hasta la base de datos y vuelve.',
     pasos: [
-      { actor: 'usuario', accion: 'El navegador pide https://cafeteria.com/api/pedidos.', decision: 'Antes de conectarse necesita resolver el nombre a una dirección.' },
-      PASO_DNS,
-      { actor: 'cloudfront', apoyos: ['acm', 'shield', 'waf'], accion: 'La edge location recibe la petición HTTPS y la filtra con WAF y Shield.', decision: 'El patrón /api/* va al origen ALB con CachingDisabled y HTTPS only: esta respuesta no se cachea.' },
-      { actor: 'internet-gateway', apoyos: ['tablas-rutas'], accion: 'La petición entra a la VPC por el Internet Gateway.', decision: 'Las subredes públicas tienen 0.0.0.0/0 hacia el IGW, por eso el ALB es alcanzable desde Internet.' },
-      { actor: 'alb-a', apoyos: ['alb-b', 'security-groups'], accion: 'Un nodo del ALB recibe la petición en su listener HTTPS; su Security Group admite 443.', decision: 'La regla del listener reenvía la petición al Target Group.' },
-      { actor: 'target-group', accion: 'Elige un destino entre las instancias registradas.', decision: 'Solo considera las que pasan el health check; esta vez elige la EC2 de us-east-1a.' },
-      { actor: 'ec2-a', apoyos: ['security-groups', 'rol-iam', 'ebs-a'], accion: 'La aplicación procesa la petición en la subred privada.', decision: 'Su SG solo acepta tráfico desde el SG del ALB; si llama a otro servicio de AWS, usa las credenciales temporales del rol.' },
-      { actor: 'rds-primaria', apoyos: ['security-groups'], accion: 'La aplicación consulta los pedidos en la base de datos primaria.', decision: 'El SG de datos solo admite el puerto del motor desde el SG de aplicación; la standby replica pero no atiende.' },
-      { actor: 'cloudfront', apoyos: ['alb-a'], accion: 'La respuesta vuelve por el ALB hasta la edge location.', decision: 'Con CachingDisabled no guarda copia: cada petición a /api/* llega al origen.' },
-      { actor: 'usuario', accion: 'Recibe sus pedidos.', decision: 'Cada petición dinámica recorrió todas las capas; por eso conviene que lo estático nunca llegue hasta aquí.' },
+      ...PASOS_BORDE('/api/pedidos'),
+      { actor: 'cloudfront', accion: 'Compara la ruta con los comportamientos de caché.', decision: '/api/* coincide con el comportamiento dinámico: no cachea y reenvía la petición al origen ALB por HTTPS.' },
+      { actor: 'internet-gateway', accion: 'La petición entra a la VPC 10.0.0.0/16.', decision: 'La ruta 0.0.0.0/0 hacia el IGW de las subredes públicas permite que los nodos del ALB reciban tráfico de Internet y respondan.' },
+      { actor: 'alb-a', involucrados: ['alb-b', 'security-groups'], accion: 'Un nodo del ALB recibe la petición en su listener HTTPS:443.', decision: 'El SG del ALB la admite (idealmente solo desde la prefix list de CloudFront) y la regla del listener la envía al Target Group de la aplicación.' },
+      { actor: 'target-group', accion: 'Elige un destino registrado.', decision: 'Solo considera instancias que pasan el health check en /health; elige una sana, en este caso la de us-east-1a.' },
+      { actor: 'ec2-a', involucrados: ['security-groups', 'rol-a', 'ebs-a'], accion: 'La instancia de la subred privada 10.0.11.0/24 procesa la petición.', decision: 'Su SG solo acepta tráfico desde el SG del ALB. Si necesita llamar a otro servicio de AWS, usa las credenciales temporales de su rol IAM.' },
+      { actor: 'rds-primaria', involucrados: ['security-groups', 'rds-standby'], accion: 'Ejecuta la consulta en la base de datos primaria.', decision: 'El SG de RDS solo acepta el puerto del motor desde el SG de las instancias. Las escrituras se replican en forma sincrónica a la standby de us-east-1b.' },
+      { actor: 'ec2-a', accion: 'Arma la respuesta y la devuelve al ALB.', decision: 'Los Security Groups son stateful: la respuesta a una conexión permitida sale sin necesitar una regla adicional.' },
+      { actor: 'usuario', involucrados: ['alb-a', 'cloudfront'], accion: 'La respuesta vuelve por el ALB y CloudFront hasta el navegador.', decision: 'CloudFront no la guarda en caché, porque el comportamiento /api/* no cachea: cada llamada vuelve a atravesar la VPC.' },
     ],
   },
 }
 
-export type EstadoTrafico = { ruta: RutaId; indice: number }
+export type EstadoTrafico = { ruta: RutaTraficoId; indice: number }
 
-export function crearEstadoTrafico(ruta: RutaId): EstadoTrafico {
+export function crearEstadoTrafico(ruta: RutaTraficoId = 'estatico-hit'): EstadoTrafico {
   return { ruta, indice: 0 }
 }
 
 export function siguientePaso(estado: EstadoTrafico): EstadoTrafico {
-  return { ...estado, indice: Math.min(estado.indice + 1, RUTAS_TRAFICO[estado.ruta].pasos.length - 1) }
+  const ultimo = RUTAS_TRAFICO[estado.ruta].pasos.length - 1
+  return { ...estado, indice: Math.min(estado.indice + 1, ultimo) }
 }
 
 export function pasoAnterior(estado: EstadoTrafico): EstadoTrafico {
   return { ...estado, indice: Math.max(estado.indice - 1, 0) }
 }
 
-export function cambiarRuta(_estado: EstadoTrafico, ruta: RutaId): EstadoTrafico {
+export function cambiarRuta(_estado: EstadoTrafico, ruta: RutaTraficoId): EstadoTrafico {
   return crearEstadoTrafico(ruta)
 }
 
+export function pasoActual(estado: EstadoTrafico): PasoTrafico {
+  return RUTAS_TRAFICO[estado.ruta].pasos[estado.indice]
+}
+
 export type ResaltadoTrafico = {
-  /** Acting node (or the user) plus the helpers that take part in the current step. */
-  activos: Actor[]
-  /** Nodes crossed in earlier steps that are not active now. */
-  recorridos: NodoId[]
-  /** Actor of the previous step, or null on the first step. */
-  anterior: Actor | null
+  /** Actor + involved nodes of the current step. */
+  activos: ActorId[]
+  /** Actors of earlier steps that are not active now. */
+  recorridos: ActorId[]
+  /** Actor of the previous step, to draw the hop into the current one. */
+  anterior: ActorId | null
 }
 
 export function resaltadoTrafico(estado: EstadoTrafico): ResaltadoTrafico {
   const pasos = RUTAS_TRAFICO[estado.ruta].pasos
-  const actual = pasos[estado.indice]
-  const activos: Actor[] = [actual.actor, ...(actual.apoyos ?? [])]
-  const recorridos = new Set<NodoId>()
-  for (const paso of pasos.slice(0, estado.indice)) {
-    for (const actor of [paso.actor, ...(paso.apoyos ?? [])]) {
-      if (actor !== 'usuario' && !activos.includes(actor)) recorridos.add(actor)
-    }
-  }
-  return { activos, recorridos: [...recorridos], anterior: estado.indice > 0 ? pasos[estado.indice - 1].actor : null }
+  const paso = pasos[estado.indice]
+  const activos: ActorId[] = [paso.actor, ...(paso.involucrados ?? [])]
+  const recorridos = [...new Set(pasos.slice(0, estado.indice).map(({ actor }) => actor))].filter((actor) => !activos.includes(actor))
+  return { activos, recorridos, anterior: estado.indice > 0 ? pasos[estado.indice - 1].actor : null }
 }
 
-// ─── Modo 3 · Alta disponibilidad ────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Modo 3 · Alta disponibilidad
+// ---------------------------------------------------------------------------
 
-export type FaseFalla = { titulo: string; descripcion: string; nodos: Partial<Record<NodoId, Exclude<Salud, 'ok'>>> }
-export type Falla = {
+export type EstadoNodo = 'ok' | 'caido' | 'degradado' | 'recuperando'
+
+export const ESTADO_NODO_LABEL: Record<EstadoNodo, string> = {
+  ok: 'funcionando',
+  caido: 'caído',
+  degradado: 'degradado',
+  recuperando: 'recuperándose',
+}
+
+export type FallaId = 'instancia' | 'zona' | 'nat'
+
+export type FaseFalla = {
   titulo: string
+  descripcion: string
+  /** Nodes not listed are 'ok'. */
+  estados: Partial<Record<NodoId, EstadoNodo>>
+}
+
+export type Falla = {
+  id: FallaId
+  label: string
   resumen: string
   fases: FaseFalla[]
   sigueFuncionando: string[]
@@ -659,50 +532,75 @@ export type Falla = {
   recuperacion: string
 }
 
-const ZONA_A_CAIDA = {
-  'az-a': 'caido', 'subred-publica-a': 'caido', 'subred-privada-a': 'caido', 'alb-a': 'caido',
-  'nat-a': 'caido', 'ec2-a': 'caido', 'ebs-a': 'caido', 'rds-primaria': 'caido',
-} as const
+const ZONA_A_CAIDA: Partial<Record<NodoId, EstadoNodo>> = {
+  'az-a': 'caido', 'subred-publica-a': 'caido', 'subred-privada-a': 'caido', 'alb-a': 'caido', 'nat-a': 'caido',
+  'ec2-a': 'caido', 'rol-a': 'caido', 'ebs-a': 'caido', 'rds-primaria': 'caido',
+}
 
 export const FALLAS: Record<FallaId, Falla> = {
   instancia: {
-    titulo: 'Cae una instancia',
-    resumen: 'Apache deja de responder en la EC2 de us-east-1a.',
+    id: 'instancia',
+    label: 'Cae una instancia EC2',
+    resumen: 'La instancia de us-east-1a deja de responder: proceso colgado, falla de hardware o status check fallido.',
     fases: [
-      { titulo: 'La instancia deja de responder', descripcion: 'La aplicación de la EC2 en us-east-1a se cae, aunque la máquina puede seguir encendida.', nodos: { 'ec2-a': 'caido', 'target-group': 'degradado' } },
-      { titulo: 'Falla el health check', descripcion: 'Tras varios health checks fallidos seguidos, el Target Group marca el destino como unhealthy y el ALB envía todo el tráfico a la EC2 de us-east-1b.', nodos: { 'ec2-a': 'caido', 'target-group': 'degradado', 'ec2-b': 'degradado' } },
-      { titulo: 'El ASG la reemplaza', descripcion: 'Con health checks de tipo ELB, el Auto Scaling Group ve la instancia unhealthy, la termina y lanza otra desde el Launch Template. La nueva arranca dentro de su grace period.', nodos: { 'ec2-a': 'degradado', 'target-group': 'degradado', 'ec2-b': 'degradado' } },
-      { titulo: 'Vuelve al balanceo', descripcion: 'La instancia nueva pasa el health check, el ASG la registra en el Target Group y el ALB vuelve a repartir entre las dos AZ.', nodos: {} },
+      { titulo: 'La instancia deja de responder', descripcion: 'La EC2 de us-east-1a ya no contesta. Hasta que el health check lo detecte, el ALB todavía puede enviarle peticiones, que fallan.', estados: { 'ec2-a': 'caido', 'target-group': 'degradado' } },
+      { titulo: 'Fallan los health checks', descripcion: 'El Target Group consulta /health en cada intervalo (30 segundos es un valor típico). Tras varios fallos seguidos, el umbral de no sano, marca la instancia como unhealthy.', estados: { 'ec2-a': 'caido', 'target-group': 'degradado' } },
+      { titulo: 'El Target Group la saca de rotación', descripcion: 'El ALB deja de enviarle tráfico: todas las peticiones van a la instancia de us-east-1b, que absorbe la carga sola.', estados: { 'ec2-a': 'caido', 'ec2-b': 'degradado' } },
+      { titulo: 'El ASG la reemplaza', descripcion: 'Con verificación de salud ELB, el Auto Scaling Group la considera no sana, la termina y lanza una nueva desde el Launch Template para volver a la capacidad deseada y mantener equilibradas las AZ.', estados: { 'ec2-a': 'recuperando', 'ec2-b': 'degradado', asg: 'recuperando' } },
+      { titulo: 'La nueva instancia entra en rotación', descripcion: 'Cuando termina el grace period y pasa los health checks, el Target Group la marca healthy y el ALB vuelve a repartir entre las dos AZ.', estados: {} },
     ],
-    sigueFuncionando: ['El sitio sigue respondiendo: el ALB envía las peticiones a la instancia sana de us-east-1b.', 'El contenido estático no se entera: lo sirve CloudFront desde S3.', 'La base de datos no se ve afectada.'],
-    seDegrada: ['Mientras dura el reemplazo hay la mitad de capacidad; con carga alta, la instancia restante responde más lento.', 'Las sesiones guardadas en memoria de la instancia caída se pierden.'],
-    recuperacion: 'Del orden de minutos: depende de cuántos health checks fallidos se exijan, de cuánto tarde en arrancar la instancia nueva y del grace period (tiempos exactos por verificar en cada caso). Sin health check de tipo ELB, el ASG nunca la reemplaza.',
+    sigueFuncionando: [
+      'Todas las peticiones, atendidas por la instancia de us-east-1b.',
+      'El contenido estático (CloudFront y S3) y la base de datos no se enteran de la falla.',
+    ],
+    seDegrada: [
+      'Capacidad a la mitad hasta el reemplazo: la instancia sobreviviente puede saturarse si la carga es alta.',
+      'Las peticiones que estaban en curso en la instancia caída fallan, y algunas más hasta que el health check la retira.',
+    ],
+    recuperacion: 'Detección en un par de minutos (intervalo por umbral de no sano del health check) y reemplazo en varios minutos más, según lo que tarde en arrancar la AMI y el grace period (por verificar en cada caso).',
   },
   zona: {
-    titulo: 'Cae una zona',
-    resumen: 'Toda la zona us-east-1a queda fuera de servicio.',
+    id: 'zona',
+    label: 'Cae una AZ completa',
+    resumen: 'us-east-1a queda inaccesible: todo lo que vive en esa zona deja de responder a la vez.',
     fases: [
-      { titulo: 'Se pierde us-east-1a', descripcion: 'Caen a la vez el nodo del ALB, el NAT Gateway, la EC2 y la base de datos primaria de esa zona. La aplicación de us-east-1b se queda sin base de datos.', nodos: { ...ZONA_A_CAIDA, 'target-group': 'degradado', 'ec2-b': 'degradado', 'rds-standby': 'degradado' } },
-      { titulo: 'El ALB deja de enrutar a la zona', descripcion: 'Los health checks de la EC2 de us-east-1a fallan y el ALB envía todo el tráfico a su nodo y sus destinos en us-east-1b.', nodos: { ...ZONA_A_CAIDA, 'target-group': 'degradado', 'ec2-b': 'degradado', 'rds-standby': 'degradado' } },
-      { titulo: 'RDS promueve la standby', descripcion: 'RDS Multi-AZ detecta la falla y promueve la standby de us-east-1b a primaria. El endpoint de la base de datos pasa a apuntar a ella, así que la aplicación no cambia su configuración.', nodos: { ...ZONA_A_CAIDA, 'target-group': 'degradado', 'ec2-b': 'degradado' } },
-      { titulo: 'El ASG lanza en la zona sobreviviente', descripcion: 'El Auto Scaling Group ve menos instancias que la capacidad deseada y lanza los reemplazos en us-east-1b, la única zona disponible de las que tiene configuradas.', nodos: { ...ZONA_A_CAIDA } },
+      { titulo: 'us-east-1a deja de responder', descripcion: 'Caen a la vez el nodo del ALB, el NAT Gateway, la instancia EC2 y la base RDS primaria de esa zona. Mientras la primaria no se reemplace, la aplicación no puede consultar datos.', estados: { ...ZONA_A_CAIDA, 'target-group': 'degradado', 'ec2-b': 'degradado' } },
+      { titulo: 'El ALB deja de enviar tráfico a esa zona', descripcion: 'Los health checks de los destinos de us-east-1a fallan y el nodo del ALB en esa zona deja de recibir tráfico: el mismo ALB sigue atendiendo por su nodo de us-east-1b.', estados: { ...ZONA_A_CAIDA, 'ec2-b': 'degradado' } },
+      { titulo: 'RDS promueve la standby', descripcion: 'RDS Multi-AZ detecta la falla de la primaria, promueve la standby de us-east-1b a primaria y actualiza el DNS del endpoint. La aplicación sigue usando el mismo endpoint y se reconecta; durante el failover las consultas fallan.', estados: { ...ZONA_A_CAIDA, 'rds-standby': 'recuperando', 'ec2-b': 'degradado' } },
+      { titulo: 'El ASG lanza instancias en us-east-1b', descripcion: 'Para volver a la capacidad deseada, el Auto Scaling Group lanza los reemplazos en la única subred privada que sigue disponible: 10.0.12.0/24, en us-east-1b.', estados: { ...ZONA_A_CAIDA, 'ec2-b': 'recuperando', asg: 'recuperando' } },
+      { titulo: 'Servicio restablecido en una sola AZ', descripcion: 'us-east-1b atiende todo el tráfico con la capacidad deseada. La arquitectura sigue funcionando, pero ya no tolera otra falla de zona hasta que us-east-1a vuelva y RDS y el ASG se reequilibren.', estados: { ...ZONA_A_CAIDA } },
     ],
-    sigueFuncionando: ['CloudFront, Route 53 y S3 no dependen de la zona: el contenido estático sigue servido.', 'El ALB sigue respondiendo con su nodo de us-east-1b.', 'Los datos no se pierden: la standby tenía una réplica sincrónica.'],
-    seDegrada: ['Durante el failover de RDS las peticiones dinámicas fallan o esperan.', 'Hasta que el ASG repone capacidad, una sola zona atiende todo el tráfico.', 'La arquitectura queda sin redundancia de zona hasta que us-east-1a vuelva.'],
-    recuperacion: 'El failover de RDS Multi-AZ suele completarse en un par de minutos (por verificar en la documentación vigente); reponer la capacidad con el ASG agrega varios minutos más. La redundancia completa vuelve solo cuando se recupera la zona.',
+    sigueFuncionando: [
+      'El contenido estático: CloudFront y S3 no dependen de las AZ de la VPC.',
+      'Las peticiones dinámicas, atendidas por el nodo del ALB y las instancias de us-east-1b.',
+      'Los datos confirmados: la standby recibía una copia sincrónica de cada escritura.',
+    ],
+    seDegrada: [
+      'Durante el failover de RDS las consultas fallan y las conexiones abiertas se cortan.',
+      'Capacidad reducida hasta que el ASG completa los reemplazos en us-east-1b.',
+      'Se pierde la redundancia: una segunda falla ya no tiene dónde apoyarse.',
+    ],
+    recuperacion: 'El ALB deja de usar la zona en cuestión de segundos a un par de minutos; el failover de RDS Multi-AZ suele tardar uno o dos minutos; los reemplazos del ASG, varios minutos más (tiempos por verificar).',
   },
   nat: {
-    titulo: 'Cae un NAT Gateway',
-    resumen: 'El NAT Gateway de us-east-1a deja de funcionar.',
+    id: 'nat',
+    label: 'Cae el NAT Gateway de una AZ',
+    resumen: 'El NAT Gateway de us-east-1a deja de reenviar tráfico.',
     fases: [
-      { titulo: 'Falla el NAT de us-east-1a', descripcion: 'La ruta 0.0.0.0/0 de la subred privada de us-east-1a apunta a un NAT que ya no responde.', nodos: { 'nat-a': 'caido' } },
-      { titulo: 'Las instancias privadas pierden la salida', descripcion: 'La EC2 de us-east-1a no puede iniciar conexiones hacia Internet: dnf update, descargas de paquetes y llamadas a APIs externas fallan.', nodos: { 'nat-a': 'caido', 'ec2-a': 'degradado', 'subred-privada-a': 'degradado', 'tablas-rutas': 'degradado' } },
-      { titulo: 'Las peticiones entrantes siguen', descripcion: 'Las peticiones de usuarios entran por el ALB y la respuesta vuelve por el mismo camino, sin pasar por el NAT. La EC2 sigue sana en el Target Group.', nodos: { 'nat-a': 'caido', 'ec2-a': 'degradado', 'subred-privada-a': 'degradado', 'tablas-rutas': 'degradado' } },
-      { titulo: 'Se redirige la salida', descripcion: 'Alguien cambia la ruta 0.0.0.0/0 de la subred privada de us-east-1a hacia el NAT de us-east-1b, pagando tráfico entre zonas, o crea un NAT nuevo y actualiza la ruta.', nodos: { 'nat-a': 'caido' } },
+      { titulo: 'El NAT Gateway de us-east-1a falla', descripcion: 'La tabla de rutas de la subred privada 10.0.11.0/24 sigue enviando 0.0.0.0/0 a ese NAT, que ya no reenvía tráfico.', estados: { 'nat-a': 'caido', 'tablas-rutas': 'degradado' } },
+      { titulo: 'Las instancias de us-east-1a pierden la salida', descripcion: 'No pueden descargar actualizaciones (dnf update), paquetes ni llamar a APIs externas. Las peticiones que llegan desde el ALB siguen funcionando: el tráfico de entrada no pasa por el NAT.', estados: { 'nat-a': 'caido', 'tablas-rutas': 'degradado', 'ec2-a': 'degradado' } },
+      { titulo: 'Nadie corrige la ruta automáticamente', descripcion: 'Ni el ASG ni el ALB lo detectan: el health check sigue pasando, salvo que /health verifique una dependencia externa. Hay que recrear el NAT o apuntar temporalmente la ruta de la subred privada al NAT de us-east-1b, aceptando cargos entre AZ.', estados: { 'nat-a': 'caido', 'tablas-rutas': 'degradado', 'ec2-a': 'degradado' } },
     ],
-    sigueFuncionando: ['Las peticiones entrantes desde el ALB se atienden normalmente.', 'Las instancias de us-east-1b salen por su propio NAT Gateway.', 'La base de datos y el contenido estático no se ven afectados.'],
-    seDegrada: ['Las EC2 de us-east-1a pierden la salida a Internet: actualizaciones, descargas y APIs externas.', 'Una instancia nueva que necesite descargar paquetes en su User Data puede no llegar a estar sana.'],
-    recuperacion: 'No es automática: la tabla de rutas no cambia de NAT por sí sola, así que depende de cuánto se tarde en detectar la falla y corregir la ruta. Un NAT por AZ limita el impacto a una sola zona.',
+    sigueFuncionando: [
+      'Todas las peticiones entrantes, en las dos AZ: el ALB y los health checks no usan el NAT.',
+      'La salida a Internet de las instancias de us-east-1b, que usan su propio NAT Gateway.',
+      'La base de datos, CloudFront y S3.',
+    ],
+    seDegrada: [
+      'Las instancias de us-east-1a se quedan sin salida a Internet: fallan actualizaciones, descargas y llamadas a APIs externas.',
+      'Si la aplicación llama a una API externa en cada petición, las que atiende us-east-1a fallan aunque el balanceador las considere sanas.',
+    ],
+    recuperacion: 'No hay recuperación automática: depende de que alguien lo detecte (por ejemplo, con una alarma de CloudWatch) y corrija la ruta o el NAT; con un procedimiento preparado, unos minutos (por verificar). El NAT Gateway es redundante dentro de su AZ, así que esta falla aislada es poco común.',
   },
 }
 
@@ -729,373 +627,12 @@ export function restablecer(): EstadoFallas {
   return crearEstadoFallas()
 }
 
-export function estadoNodos(estado: EstadoFallas): Record<NodoId, Salud> {
-  const salud = Object.fromEntries(NODOS.map(({ id }) => [id, 'ok'])) as Record<NodoId, Salud>
-  if (!estado.falla) return salud
-  const fases = FALLAS[estado.falla].fases
-  const fase = fases[Math.min(Math.max(estado.fase, 0), fases.length - 1)]
-  return { ...salud, ...fase.nodos }
+export function faseActual(estado: EstadoFallas): FaseFalla | null {
+  return estado.falla ? FALLAS[estado.falla].fases[estado.fase] : null
 }
 
-// ─── Modo 2 · Seguridad por capas ────────────────────────────────────────────
-
-export type ControlId = 'tls' | 'waf-shield' | 'security-groups' | 'nacl' | 'iam' | 'oac' | 'cifrado-reposo'
-
-export type ControlSeguridad = {
-  id: ControlId
-  titulo: string
-  /** Where the control acts, in words. */
-  alcance: string
-  /** Nodes it acts on (including the component that implements it). */
-  nodos: NodoId[]
-  /** Network legs it protects. */
-  aristas: string[]
-  protegeContra: string[]
-  /** The pedagogical point: what stays exposed if this were the only layer. */
-  noCubre: string[]
-  herramienta?: { href: string; etiqueta: string }
-}
-
-const VERIFICADOR_SG_NACL = { href: '/herramientas/sg-nacl', etiqueta: 'Verificador SG vs NACL' }
-
-export const CONTROLES_SEGURIDAD: ControlSeguridad[] = [
-  {
-    id: 'tls', titulo: 'TLS (HTTPS)',
-    alcance: 'Cada tramo de red por separado: usuario a CloudFront, CloudFront al ALB y CloudFront a S3, con certificados de ACM.',
-    nodos: ['cloudfront', 'acm', 'alb-a', 'alb-b', 's3'],
-    aristas: ['usuario->cloudfront', 'cloudfront->internet-gateway', 'internet-gateway->alb-a', 'internet-gateway->alb-b', 'cloudfront->s3'],
-    protegeContra: [
-      'Que alguien en el camino lea o modifique la petición: da confidencialidad, integridad y autenticidad del servidor.',
-      'Con Redirect HTTP to HTTPS hacia el usuario y HTTPS only hacia el ALB, ningún tramo por Internet viaja en claro.',
-    ],
-    noCubre: [
-      'Cada tramo se cifra por separado: cifrar solo el primero deja el segundo en claro.',
-      'El ALB termina TLS: el tramo del ALB a las EC2 dentro de la VPC no queda cifrado por esta capa, salvo que también se configure HTTPS hacia los destinos.',
-      'No filtra nada: una inyección SQL llega igual de bien cifrada.',
-      'No protege los datos guardados en discos, bases o buckets: eso es el cifrado en reposo.',
-    ],
-  },
-  {
-    id: 'waf-shield', titulo: 'WAF y Shield',
-    alcance: 'En el borde, sobre la distribución de CloudFront. Shield Standard también protege Route 53.',
-    nodos: ['route53', 'cloudfront', 'waf', 'shield'],
-    aristas: ['usuario->cloudfront'],
-    protegeContra: [
-      'WAF bloquea patrones de capa 7 como inyección SQL, excesos de tasa desde una misma IP o IPs de mala reputación.',
-      'Shield Standard absorbe ataques DDoS volumétricos de capas 3 y 4 antes de que lleguen a la VPC.',
-    ],
-    noCubre: [
-      'Solo filtra lo que pasa por CloudFront: con el SG del ALB abierto a 80 y 443 desde Internet, quien conozca el DNS del ALB lo alcanza directo y esquiva WAF (restringir el ALB para que solo acepte a CloudFront es posible, por verificar el mecanismo vigente).',
-      'Una petición maliciosa que no coincide con ninguna regla llega a la aplicación: WAF solo bloquea lo que sus reglas describen.',
-      'No controla el tráfico interno de la VPC ni las llamadas a la API de AWS.',
-    ],
-  },
-  {
-    id: 'security-groups', titulo: 'Security Groups',
-    alcance: 'Por interfaz de red de cada recurso: uno para el ALB, uno para la aplicación y uno para la base de datos.',
-    nodos: ['security-groups', 'alb-a', 'alb-b', 'ec2-a', 'ec2-b', 'rds-primaria', 'rds-standby'],
-    aristas: ['internet-gateway->alb-a', 'internet-gateway->alb-b', 'internet-gateway->ec2-a', 'target-group->ec2-a', 'target-group->ec2-b', 'ec2-a->rds-primaria', 'ec2-b->rds-primaria'],
-    protegeContra: [
-      'Encadenan el acceso: Internet solo llega al ALB por 80 y 443, la aplicación solo acepta al SG del ALB y la base solo el puerto del motor desde el SG de aplicación.',
-      'Son stateful: la respuesta a una conexión permitida sale sin regla adicional.',
-    ],
-    noCubre: [
-      'Solo tienen reglas allow: no pueden denegar una IP puntual; para eso está la NACL.',
-      'No inspeccionan el contenido: una inyección SQL por el puerto 443 permitido pasa.',
-      'No aplican fuera de la VPC: CloudFront y S3 quedan fuera de su alcance.',
-      'El NAT Gateway no usa Security Groups: su subred solo la filtra la NACL.',
-    ],
-    herramienta: VERIFICADOR_SG_NACL,
-  },
-  {
-    id: 'nacl', titulo: 'Network ACL',
-    alcance: 'Por subred: filtra lo que entra y sale de cada una de las subredes públicas y privadas.',
-    nodos: ['subred-publica-a', 'subred-publica-b', 'subred-privada-a', 'subred-privada-b', 'alb-a', 'alb-b', 'nat-a', 'nat-b', 'ec2-a', 'ec2-b', 'rds-primaria', 'rds-standby'],
-    aristas: ['internet-gateway->alb-a', 'internet-gateway->alb-b', 'internet-gateway->ec2-a', 'target-group->ec2-a', 'target-group->ec2-b', 'ec2-a->nat-a', 'ec2-b->nat-b', 'ec2-b->rds-primaria'],
-    protegeContra: [
-      'Admite reglas allow y deny evaluadas por orden numérico, gana la primera coincidencia: sirve para bloquear un rango de IPs en toda la subred.',
-      'Es una segunda barrera si un Security Group se abre de más.',
-    ],
-    noCubre: [
-      'La NACL por defecto permite todo el tráfico: si no la configurás, esta capa existe pero no filtra nada.',
-      'Es stateless: no recuerda conexiones, así que hay que permitir también la salida por los puertos efímeros (1024–65535) para las respuestas.',
-      'No ve el tráfico entre recursos de la misma subred, como la EC2 y la RDS primaria de us-east-1a.',
-      'No inspecciona contenido ni aplica a CloudFront o S3, que están fuera de la VPC.',
-    ],
-    herramienta: VERIFICADOR_SG_NACL,
-  },
-  {
-    id: 'iam', titulo: 'IAM',
-    alcance: 'Sobre cada llamada a la API de AWS: el rol que asume cada instancia y la política del bucket.',
-    nodos: ['rol-iam', 'ec2-a', 'ec2-b', 's3'],
-    aristas: [],
-    protegeContra: [
-      'Decide quién puede llamar a qué API de AWS: la aplicación usa las credenciales temporales del rol, sin Access Keys guardadas en el servidor.',
-      'La política del bucket, basada en recursos, solo acepta peticiones de la distribución de CloudFront.',
-    ],
-    noCubre: [
-      'No filtra tráfico de red: una petición HTTP al ALB no es una llamada a la API de AWS; eso lo controlan los Security Groups y las NACL.',
-      'No autentica a los usuarios finales de la aplicación.',
-      'Si la aplicación tiene un fallo, quien lo explote actúa con los permisos del rol: por eso el rol lleva solo los permisos mínimos.',
-    ],
-  },
-  {
-    id: 'oac', titulo: 'OAC',
-    alcance: 'Entre CloudFront y el bucket S3: el único camino de lectura del bucket.',
-    nodos: ['cloudfront', 's3'],
-    aristas: ['cloudfront->s3'],
-    protegeContra: [
-      'CloudFront firma sus peticiones y el bucket privado solo acepta las de esta distribución.',
-      'Junto con Block Public Access, nadie se salta la CDN para leer el bucket directo.',
-    ],
-    noCubre: [
-      'En esta arquitectura solo protege el origen S3: el ALB, el otro origen de la distribución, no lo usa.',
-      'No evita que alguien con permisos de IAM sobre el bucket borre o sobrescriba objetos; el versionado ayuda a recuperarlos.',
-      'No cifra los objetos guardados.',
-    ],
-  },
-  {
-    id: 'cifrado-reposo', titulo: 'Cifrado en reposo',
-    alcance: 'En los datos guardados: objetos de S3, volúmenes EBS y sus snapshots, y la base de datos de RDS, con claves de KMS.',
-    nodos: ['s3', 'ebs-a', 'ebs-b', 'rds-primaria', 'rds-standby'],
-    aristas: [],
-    protegeContra: [
-      'Si alguien obtiene el disco, un snapshot o una copia del almacenamiento, sin la clave no puede leer los datos.',
-    ],
-    noCubre: [
-      'Quien tiene acceso legítimo lee los datos ya descifrados: una inyección SQL que pasa por la aplicación devuelve datos en claro.',
-      'No protege los datos en tránsito: eso es TLS.',
-      'En EBS conviene activarlo al crear el volumen: cifrar uno existente exige snapshot, copia cifrada y volumen nuevo.',
-      'Qué viene cifrado por defecto en cada servicio cambia con el tiempo (por verificar en la documentación vigente).',
-    ],
-  },
-]
-
-/** Components that hold data or receive traffic: the ones a layer has to cover. */
-export const OBJETIVOS_SEGURIDAD: NodoId[] = [
-  'route53', 'cloudfront', 's3', 'alb-a', 'alb-b', 'nat-a', 'nat-b', 'ec2-a', 'ec2-b', 'ebs-a', 'ebs-b', 'rds-primaria', 'rds-standby',
-]
-
-export type EstadoSeguridad = { activos: ControlId[] }
-
-const ORDEN_CONTROLES = CONTROLES_SEGURIDAD.map(({ id }) => id)
-const enOrden = (ids: Iterable<ControlId>) => ORDEN_CONTROLES.filter((id) => new Set(ids).has(id))
-
-export function crearEstadoSeguridad(): EstadoSeguridad {
-  return { activos: ['security-groups'] }
-}
-
-export function alternarControl(estado: EstadoSeguridad, id: ControlId): EstadoSeguridad {
-  const activos = new Set(estado.activos)
-  if (activos.has(id)) activos.delete(id)
-  else activos.add(id)
-  return { activos: enOrden(activos) }
-}
-
-export function activarTodosControles(): EstadoSeguridad {
-  return { activos: [...ORDEN_CONTROLES] }
-}
-
-export function desactivarTodosControles(): EstadoSeguridad {
-  return { activos: [] }
-}
-
-export type CoberturaSeguridad = {
-  /** Active controls acting on each node present in the variant (only nodes with at least one). */
-  porNodo: Partial<Record<NodoId, ControlId[]>>
-  porArista: Record<string, ControlId[]>
-  /** Protected components of the variant with zero active layers. */
-  sinCobertura: NodoId[]
-  /** Protected components that depend on exactly one active layer. */
-  unaSolaCapa: NodoId[]
-}
-
-export function coberturaSeguridad(estado: EstadoSeguridad, variante: VarianteId): CoberturaSeguridad {
-  const nodos = new Set(getVariante(variante).nodos)
-  const aristas = new Set(aristasDeVariante(variante).map(idArista))
-  const porNodo: Partial<Record<NodoId, ControlId[]>> = {}
-  const porArista: Record<string, ControlId[]> = {}
-  for (const control of CONTROLES_SEGURIDAD) {
-    if (!estado.activos.includes(control.id)) continue
-    for (const id of control.nodos) if (nodos.has(id)) (porNodo[id] ??= []).push(control.id)
-    for (const id of control.aristas) if (aristas.has(id)) (porArista[id] ??= []).push(control.id)
-  }
-  const objetivos = OBJETIVOS_SEGURIDAD.filter((id) => nodos.has(id))
-  return {
-    porNodo,
-    porArista,
-    sinCobertura: objetivos.filter((id) => !porNodo[id]),
-    unaSolaCapa: objetivos.filter((id) => porNodo[id]?.length === 1),
-  }
-}
-
-// ─── Modo 4 · Costos ─────────────────────────────────────────────────────────
-
-export type CategoriaCobro = 'fijo-por-hora' | 'fijo-y-uso' | 'por-uso' | 'sin-costo'
-
-/** Rendering category over the existing cobro.modos: hourly plus usage is its own category. */
-export function categoriaCobro(id: ComponenteId): CategoriaCobro {
-  const modos = getComponente(id).cobro.modos
-  if (modos.includes('fijo-por-hora')) return modos.includes('por-uso') ? 'fijo-y-uso' : 'fijo-por-hora'
-  return modos.includes('por-uso') ? 'por-uso' : 'sin-costo'
-}
-
-export const AVISO_ESTIMACION = 'Estimación ilustrativa en unidades relativas (u): no son precios reales de AWS. Sirve para comparar qué pesa más y cómo cambia con el tráfico; para precios reales usá la calculadora de precios de AWS.'
-
-export type SorpresaId = 'nat-por-hora' | 'entre-az'
-
-export type SorpresaCosto = { id: SorpresaId; titulo: string; descripcion: string; nodos: NodoId[]; aristas: string[] }
-
-export const SORPRESAS_COSTO: SorpresaCosto[] = [
-  {
-    id: 'nat-por-hora', titulo: 'El NAT Gateway cobra de noche',
-    descripcion: 'Cobra cada hora que existe, aunque no haya tráfico, más cada GB procesado. Con uno por AZ, ese costo fijo se multiplica por la cantidad de AZ.',
-    nodos: ['nat-a', 'nat-b'], aristas: [],
-  },
-  {
-    id: 'entre-az', titulo: 'El tráfico entre AZ se cobra',
-    descripcion: 'El tráfico dentro de la misma AZ por IP privada no se cobra, pero entre AZ distintas sí, por ejemplo cuando la EC2 de us-east-1b consulta a la RDS primaria de us-east-1a. Qué tramos exactos factura cada servicio, por verificar.',
-    nodos: [], aristas: ['ec2-b->rds-primaria'],
-  },
-]
-
-export type PartidaCosto = {
-  id: string
-  titulo: string
-  /** The partida applies when these nodes are present (all of them if requiereTodos, else any). */
-  nodos: NodoId[]
-  requiereTodos?: boolean
-  /** Multiplies the fixed weight by the number of present nodes (one NAT per AZ, one EC2 per AZ...). */
-  porNodo?: boolean
-  /** Illustrative relative weight of the fixed monthly part. */
-  fijo: number
-  /** Illustrative relative weight per traffic point (0..100), optionally different per variant. */
-  porTrafico: number | Partial<Record<VarianteId, number>>
-  nota: string
-  sorpresa?: SorpresaId
-}
-
-export const PARTIDAS_COSTO: PartidaCosto[] = [
-  { id: 'nat', titulo: 'NAT Gateway', nodos: ['nat-a', 'nat-b'], porNodo: true, fijo: 3, porTrafico: 0.01, nota: 'Por hora de cada NAT, haya o no tráfico, más cada GB procesado.', sorpresa: 'nat-por-hora' },
-  { id: 'alb', titulo: 'Application Load Balancer', nodos: ['alb-a', 'alb-b'], fijo: 2, porTrafico: 0.02, nota: 'Un solo ALB: hora del balanceador más la capacidad consumida.' },
-  { id: 'ec2', titulo: 'EC2 (capacidad mínima)', nodos: ['ec2-a', 'ec2-b'], porNodo: true, fijo: 3, porTrafico: 0, nota: 'Cada instancia encendida cobra por hora, atienda o no peticiones.' },
-  { id: 'asg', titulo: 'EC2 extra que lanza el ASG', nodos: ['auto-scaling-group'], fijo: 0, porTrafico: { intermedia: 0.04, completa: 0.02 }, nota: 'Con más tráfico el ASG suma instancias. Detrás de CloudFront escala menos porque lo estático no llega al origen.' },
-  { id: 'rds', titulo: 'RDS Multi-AZ', nodos: ['rds-primaria', 'rds-standby'], porNodo: true, fijo: 4, porTrafico: 0, nota: 'Hora de la primaria y también de la standby, más almacenamiento y respaldos.' },
-  { id: 'ebs', titulo: 'Volúmenes EBS', nodos: ['ebs-a', 'ebs-b'], porNodo: true, fijo: 0.5, porTrafico: 0, nota: 'Por GB aprovisionado al mes, aunque la instancia esté detenida.' },
-  { id: 'salida', titulo: 'Datos hacia Internet', nodos: ['internet-gateway'], fijo: 0, porTrafico: 0.05, nota: 'Cada GB que sale hacia los usuarios. En la Completa lo factura CloudFront; sin CDN sale desde la VPC, con otras tarifas (por verificar).' },
-  { id: 'entre-az', titulo: 'Tráfico entre AZ', nodos: ['az-a', 'az-b'], requiereTodos: true, fijo: 0, porTrafico: 0.01, nota: 'Solo existe con dos AZ y crece con el tráfico.', sorpresa: 'entre-az' },
-  { id: 'waf', titulo: 'AWS WAF', nodos: ['waf'], fijo: 1, porTrafico: 0.01, nota: 'Por web ACL y por regla al mes, más las peticiones inspeccionadas.' },
-  { id: 's3', titulo: 'Bucket S3', nodos: ['s3'], fijo: 0.3, porTrafico: 0.005, nota: 'Almacenamiento y versiones, más las peticiones de los cache miss.' },
-  { id: 'route53', titulo: 'Route 53', nodos: ['route53'], fijo: 0.2, porTrafico: 0, nota: 'Zona alojada al mes; las consultas ALIAS hacia recursos de AWS no se cobran.' },
-  { id: 'cloudwatch', titulo: 'CloudWatch', nodos: ['cloudwatch'], fijo: 0.3, porTrafico: 0, nota: 'Las alarmas del target tracking; las métricas básicas de EC2 no tienen costo.' },
-]
-
-export type PartidaEstimada = { id: string; titulo: string; nota: string; unidades: number; fijo: number; variable: number; sorpresa?: SorpresaId }
-export type EstimacionCosto = {
-  total: number
-  fijo: number
-  variable: number
-  partidas: PartidaEstimada[]
-  /** What the NAT Gateways charge with zero traffic. */
-  natEnReposo: number
-  /** Whether the variant adds capacity with traffic (has an ASG). */
-  escala: boolean
-}
-
-export const TRAFICO_MAXIMO = 100
-
-export function estimarCosto(variante: VarianteId, trafico: number): EstimacionCosto {
-  const nivel = Math.min(Math.max(trafico, 0), TRAFICO_MAXIMO)
-  const nodos = new Set(getVariante(variante).nodos)
-  const partidas: PartidaEstimada[] = []
-  for (const partida of PARTIDAS_COSTO) {
-    const presentes = partida.nodos.filter((id) => nodos.has(id)).length
-    if (presentes === 0 || (partida.requiereTodos && presentes < partida.nodos.length)) continue
-    const fijo = partida.fijo * (partida.porNodo ? presentes : 1)
-    const peso = typeof partida.porTrafico === 'number' ? partida.porTrafico : (partida.porTrafico[variante] ?? 0)
-    const variable = peso * nivel
-    partidas.push({ id: partida.id, titulo: partida.titulo, nota: partida.nota, fijo, variable, unidades: fijo + variable, sorpresa: partida.sorpresa })
-  }
-  const fijo = partidas.reduce((suma, { fijo: valor }) => suma + valor, 0)
-  const variable = partidas.reduce((suma, { variable: valor }) => suma + valor, 0)
-  return {
-    total: fijo + variable,
-    fijo,
-    variable,
-    partidas,
-    natEnReposo: partidas.find(({ id }) => id === 'nat')?.fijo ?? 0,
-    escala: nodos.has('auto-scaling-group'),
-  }
-}
-
-export function etiquetaTrafico(trafico: number): string {
-  if (trafico <= 0) return 'Sin tráfico (por ejemplo, de noche)'
-  if (trafico <= 30) return 'Tráfico bajo'
-  if (trafico <= 60) return 'Tráfico medio'
-  return 'Tráfico alto'
-}
-
-// ─── Modo 5 · Ruta de aprendizaje ────────────────────────────────────────────
-
-export type ModuloRutaId = 'vpc' | 'ec2' | 'iam' | 'elasticidad' | 'cloudfront'
-export type Progreso = 'dominado' | 'en-curso' | 'no-visto'
-export type ModuloRuta = { id: ModuloRutaId; etiqueta: string; href: string }
-
-export const MODULOS_RUTA: ModuloRuta[] = [M_VPC, M_EC2, M_IAM, M_ELASTICIDAD, M_CLOUDFRONT].map((modulo) => ({
-  id: modulo.href.replace('/servicios/', '') as ModuloRutaId,
-  etiqueta: modulo.etiqueta,
-  href: modulo.href,
-}))
-
-/**
- * Module where each component is studied. Components linked to the architecture guide
- * (ALB, Target Group, Security Groups) are assigned to the course module that covers them.
- */
-export const MODULO_DE_COMPONENTE: Record<ComponenteId, ModuloRutaId> = {
-  vpc: 'vpc', 'zona-disponibilidad': 'vpc', 'subred-publica': 'vpc', 'subred-privada': 'vpc', 'internet-gateway': 'vpc',
-  'nat-gateway': 'vpc', 'tablas-rutas': 'vpc', 'security-groups': 'vpc',
-  ec2: 'ec2', ebs: 'ec2', rds: 'ec2',
-  'rol-iam': 'iam',
-  'auto-scaling-group': 'elasticidad', cloudwatch: 'elasticidad', alb: 'elasticidad', 'target-group': 'elasticidad',
-  cloudfront: 'cloudfront', acm: 'cloudfront', s3: 'cloudfront', waf: 'cloudfront', shield: 'cloudfront', route53: 'cloudfront',
-}
-
-/** avance = index in MODULOS_RUTA of the module in progress; MODULOS_RUTA.length means all done. */
-export type EstadoRuta = { avance: number; ajustes: Partial<Record<ComponenteId, Progreso>> }
-
-export function crearEstadoRuta(): EstadoRuta {
-  return { avance: 0, ajustes: {} }
-}
-
-export function fijarAvance(_estado: EstadoRuta, avance: number): EstadoRuta {
-  return { avance: Math.min(Math.max(Math.round(avance), 0), MODULOS_RUTA.length), ajustes: {} }
-}
-
-export function marcarProgreso(estado: EstadoRuta, componente: ComponenteId, progreso: Progreso): EstadoRuta {
-  return { ...estado, ajustes: { ...estado.ajustes, [componente]: progreso } }
-}
-
-const INDICE_MODULO = new Map(MODULOS_RUTA.map(({ id }, indice) => [id, indice]))
-
-export function progresoComponentes(estado: EstadoRuta): Record<ComponenteId, Progreso> {
-  return Object.fromEntries(COMPONENTES.map(({ id }) => {
-    const indice = INDICE_MODULO.get(MODULO_DE_COMPONENTE[id])!
-    const derivado: Progreso = indice < estado.avance ? 'dominado' : indice === estado.avance ? 'en-curso' : 'no-visto'
-    return [id, estado.ajustes[id] ?? derivado]
-  })) as Record<ComponenteId, Progreso>
-}
-
-export function resumenProgreso(estado: EstadoRuta): Record<Progreso, number> {
-  const resumen: Record<Progreso, number> = { dominado: 0, 'en-curso': 0, 'no-visto': 0 }
-  for (const progreso of Object.values(progresoComponentes(estado))) resumen[progreso]++
-  return resumen
-}
-
-/** Unseen components grouped by module, in course order. */
-export function pendientesPorModulo(estado: EstadoRuta): { modulo: ModuloRuta; componentes: ComponenteId[] }[] {
-  const progreso = progresoComponentes(estado)
-  return MODULOS_RUTA.map((modulo) => ({
-    modulo,
-    componentes: COMPONENTES.map(({ id }) => id).filter((id) => MODULO_DE_COMPONENTE[id] === modulo.id && progreso[id] === 'no-visto'),
-  })).filter(({ componentes }) => componentes.length > 0)
+export function estadoNodos(estado: EstadoFallas): Record<NodoId, EstadoNodo> {
+  const base = Object.fromEntries(NODOS.map(({ id }) => [id, 'ok'])) as Record<NodoId, EstadoNodo>
+  const fase = faseActual(estado)
+  return fase ? { ...base, ...fase.estados } : base
 }
