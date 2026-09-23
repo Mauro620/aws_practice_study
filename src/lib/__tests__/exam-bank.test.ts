@@ -7,8 +7,25 @@ import {
 } from '../exam-bank'
 
 describe('BANCO_PREGUNTAS', () => {
-  it('tiene 7 preguntas (las del banco del curso)', () => {
-    expect(BANCO_PREGUNTAS).toHaveLength(7)
+  it('tiene 19 preguntas: las 7 del banco del curso más 12 de elasticidad y entrega de contenido', () => {
+    expect(BANCO_PREGUNTAS).toHaveLength(19)
+  })
+
+  it('las preguntas nuevas siguen la secuencia P8–P19 y cada una cierra con una regla', () => {
+    const nuevas = BANCO_PREGUNTAS.slice(7)
+    expect(nuevas.map((p) => p.id)).toEqual(Array.from({ length: 12 }, (_, i) => `P${i + 8}`))
+    for (const p of nuevas) {
+      expect(p.regla?.length ?? 0).toBeGreaterThan(0)
+      for (const o of p.opciones) {
+        expect(o.id).toBe(`${p.id}-${o.letra}`)
+      }
+    }
+  })
+
+  it('cubre elasticidad y entrega de contenido con seis preguntas cada uno', () => {
+    const porTema = (prefijo: string) => BANCO_PREGUNTAS.filter((p) => p.tema.startsWith(prefijo)).length
+    expect(porTema('Elasticidad')).toBe(6)
+    expect(porTema('Entrega de contenido')).toBe(6)
   })
 
   it('cada pregunta tiene opciones, correctas y justificaciones coherentes', () => {
@@ -104,17 +121,17 @@ describe('evaluarPregunta — P6 y P7 son pares deliberados', () => {
 })
 
 describe('evaluarExamen', () => {
-  it('todas correctas → 7/7', () => {
+  it('todas correctas → total/total', () => {
     const respuestas = BANCO_PREGUNTAS.map((p) => ({
       preguntaId: p.id,
       elegidas: p.correctas,
     }))
     const r = evaluarExamen(BANCO_PREGUNTAS, respuestas)
-    expect(r.total).toBe(7)
-    expect(r.correctas).toBe(7)
+    expect(r.total).toBe(BANCO_PREGUNTAS.length)
+    expect(r.correctas).toBe(BANCO_PREGUNTAS.length)
   })
 
-  it('todas vacías → 0/7', () => {
+  it('todas vacías → 0/total', () => {
     const respuestas = BANCO_PREGUNTAS.map((p) => ({ preguntaId: p.id, elegidas: [] }))
     const r = evaluarExamen(BANCO_PREGUNTAS, respuestas)
     expect(r.correctas).toBe(0)
@@ -126,10 +143,9 @@ describe('evaluarExamen', () => {
       elegidas: i % 2 === 0 ? p.correctas : [],
     }))
     const r = evaluarExamen(BANCO_PREGUNTAS, respuestas)
-    // 4 pares: 0,2,4,6 correctas (4 preguntas), pero las impares están vacías
-    // 0 vacías: no cuentan. multiple-2 missing picks y simple missing dan false.
-    // Esperado: 4 correctas (0,2,4,6) de 7
-    expect(r.correctas).toBe(4)
+    // Índices pares respondidos bien, impares vacíos (vacío nunca es acierto).
+    // Esperado: ceil(n / 2) correctas.
+    expect(r.correctas).toBe(Math.ceil(BANCO_PREGUNTAS.length / 2))
   })
 })
 

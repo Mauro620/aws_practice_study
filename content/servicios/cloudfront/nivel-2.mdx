@@ -1,0 +1,56 @@
+---
+titulo: Un bucket privado con CloudFront delante
+---
+
+El caso mínimo que efectivamente funciona: un **bucket de S3 privado** con archivos estáticos (un `index.html`, imágenes, CSS) y una **distribución de CloudFront** delante, que es la única forma de llegar a ese contenido.
+
+## Los pasos
+
+```
+1. Creás el bucket, por ejemplo: sitio-cafeteria-2026
+   → Block Public Access queda ACTIVADO (viene así por defecto)
+2. Subís los archivos: index.html, css/estilos.css, img/logo.png
+3. Creás una distribución de CloudFront:
+   → Origen: el bucket de S3
+   → Acceso al origen: Origin Access Control (OAC)
+   → Protocolo del visor: Redirect HTTP to HTTPS
+   → Objeto raíz por defecto: index.html
+4. CloudFront te propone una política de bucket que solo
+   acepta peticiones de ESA distribución → la pegás en el bucket
+5. Abrís https://d1a2b3c4d5e6f7.cloudfront.net
+```
+
+En ningún paso el bucket se vuelve público. Eso es lo importante del caso mínimo.
+
+## Qué hace cada pieza
+
+| Pieza | Responsabilidad | Qué pasa si falta |
+| --- | --- | --- |
+| **Bucket privado** | Guarda el contenido | — |
+| **Block Public Access** | Impide cualquier acceso público, prevalece sobre políticas y ACL | Una política o ACL mal escrita expone el bucket |
+| **OAC** | CloudFront firma cada petición al origen | CloudFront no puede leer un bucket privado |
+| **Política de bucket** | Acepta solo peticiones firmadas por esa distribución | Aunque CloudFront firme, el bucket no le da permiso |
+| **Distribución** | Cachea en el borde y entrega por HTTPS | El usuario tendría que ir al bucket directo |
+
+La política de bucket es una **política basada en recursos**, como las del [módulo IAM](/servicios/iam): tiene `Principal` (el servicio de CloudFront) y una condición que la ata al ARN de *esa* distribución concreta. Sin esa condición, cualquier distribución de cualquier cuenta podría leer tu bucket.
+
+```
+Usuario ──► CloudFront ──[petición firmada]──► Bucket S3 PRIVADO
+                                                (política: solo esta
+Usuario ──────────── acceso directo ────► ❌    distribución)
+```
+
+## Por qué no simplemente hacer público el bucket
+
+Si el bucket es público, CloudFront puede leerlo — pero cualquiera también. El usuario (o un atacante) se salta la CDN y va directo al origen: perdés el caché, el control de acceso y las métricas, y el bucket queda expuesto a lo que Block Public Access existe justamente para impedir.
+
+> **La regla práctica:** un bucket casi nunca necesita ser público. Si creés que lo necesitás, probablemente lo que necesitás es CloudFront delante.
+
+## Dos cosas que ya funcionan y no se ven
+
+- **HTTPS sin configurar certificados.** El dominio `*.cloudfront.net` ya trae un certificado válido. El trabajo de certificados empieza cuando querés tu propio dominio (siguiente nivel).
+- **La transferencia de S3 hacia CloudFront no se cobra.** Es tráfico interno de AWS. Poner CloudFront delante de S3 suele salir más barato que servir desde S3 directo, además de más rápido, y el caché reduce los `GET` que llegan al bucket.
+
+## El dominio que te asignan
+
+La distribución recibe un dominio con la forma `d1a2b3c4d5e6f7.cloudfront.net` (termina en `.net`, no en `.com`). Funciona perfecto, pero nadie quiere dárselo a un cliente. Ponerle un nombre propio requiere dos cosas que van siempre juntas: un registro DNS y un certificado que cubra ese nombre.

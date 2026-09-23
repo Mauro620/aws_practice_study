@@ -1,0 +1,39 @@
+---
+titulo: El restaurante que abre y cierra mesas según la fila
+---
+
+Pensá en un restaurante con un problema clásico: los martes a las cuatro de la tarde entran cinco personas; los sábados a las nueve de la noche hay fila hasta la esquina. Si contrata meseros y arma mesas para el sábado, paga sueldos y ocupa espacio toda la semana para nada. Si los contrata para el martes, el sábado la gente se cansa de esperar y se va.
+
+Un centro de datos tradicional tiene exactamente ese problema: se compra hardware para el **pico** y queda ocioso el resto del tiempo. La nube permite otra cosa, y esa otra cosa se llama **elasticidad**: ajustar la capacidad a la demanda real, automáticamente — agregarla cuando sube y retirarla cuando baja.
+
+## Dos formas de atender a más gente
+
+| | Escalado vertical | Escalado horizontal |
+| --- | --- | --- |
+| En el restaurante | Cambiar a un mesero que corra el doble de rápido | Llamar a más meseros y abrir más mesas |
+| En AWS | Cambiar la instancia por una más grande | Agregar más instancias |
+| Límite | El mesero más rápido que exista | Prácticamente ninguno |
+| ¿Hay que cerrar para hacerlo? | Sí: hay que detener la instancia | No |
+| Si ese mesero se enferma | Se cae todo el servicio | Los demás siguen atendiendo |
+
+**La nube favorece el horizontal.** Pero tiene una condición: cualquier mesero tiene que poder atender cualquier mesa. Si cada mesero anota los pedidos en una libreta que solo él tiene, cuando se va a su casa los pedidos se pierden. En una aplicación, esa libreta es el **estado local** — sesiones en memoria, archivos en el disco de la instancia — y es lo que impide escalar horizontalmente. El estado tiene que vivir afuera, en un lugar que todos los meseros consulten.
+
+## Los tres personajes del restaurante
+
+| En el restaurante | En AWS | Qué hace |
+| --- | --- | --- |
+| **El anfitrión en la puerta**, que ubica a cada cliente en una mesa libre y nunca lo manda a una mesa donde el mesero no está | **Load balancer + Target Group** | Reparte el tráfico solo entre las instancias sanas |
+| **El gerente**, que mira la fila y llama a más meseros cuando crece, o manda a algunos a casa cuando se vacía | **Auto Scaling Group (ASG)** | Decide cuántas instancias debe haber, y las crea o elimina |
+| **El contador de la puerta**, que anota cuánta gente espera y le avisa al gerente cuando la fila pasa de cierto largo | **CloudWatch** | Mide y dispara alarmas cuando se cruza un umbral |
+
+Ninguno funciona solo. Un contador sin gerente solo produce avisos que nadie atiende. Un gerente sin anfitrión llama meseros que nadie sabe que existen: están parados en la cocina mientras la fila sigue en la puerta.
+
+## El gerente tiene reglas que no negocia
+
+- **Nunca menos de dos meseros** (el mínimo), aunque el restaurante esté vacío: si uno se enferma, alguien tiene que atender.
+- **Nunca más de diez** (el máximo), aunque la fila dé la vuelta a la manzana: es el límite de lo que el restaurante puede pagar.
+- **Si un mesero no aparece, llama a otro** sin que nadie se lo pida. Ese reemplazo automático es tan importante como el crecimiento.
+
+## Lo que la analogía ya anticipa
+
+Un mesero nuevo no llega en un segundo: hay que llamarlo, tiene que llegar, cambiarse y aprender dónde está cada cosa. Mientras tanto, la fila sigue. **El escalado automático no es instantáneo**, y buena parte del módulo trata de cómo convivir con ese retraso — y de por qué el gerente es mucho más prudente para mandar gente a casa que para llamarla.

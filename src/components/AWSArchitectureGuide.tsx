@@ -60,7 +60,16 @@ const sections: GuideSection[] = [
     deepDive: { title: 'La decisión del health check que suele romper la arquitectura', content: 'Un Target Group no es solo una lista. Su health check define la condición mínima para enviar tráfico. Si apunta a un endpoint que responde 200 solo cuando la base de datos está disponible, una desconexión de BD hará que el balanceador marque la EC2 como insana y corte todo el tráfico de usuarios. El endpoint debe representar la salud que realmente quieres retirar del balanceo.' },
   },
   {
-    id: 'access', number: '06', title: 'Resolver acceso con Elastic IP y SSH', eyebrow: 'Operación segura',
+    id: 'auto-scaling-groups', number: '06', title: 'Escalar con Auto Scaling Groups', eyebrow: 'Elasticidad',
+    summary: 'El Auto Scaling Group decide cuántas instancias debe haber y las crea o elimina. CloudWatch mide; el Target Group de la etapa anterior reparte el tráfico solo entre las sanas.',
+    how: ['Parte de una AMI propia (EC2 > Instances > Actions > Image and templates > Create image) y ve a EC2 > Launch Templates > Create launch template. Define AMI, tipo de instancia, key pair, Security Group de aplicación y rol de IAM.', 'Ve a EC2 > Auto Scaling Groups > Create Auto Scaling group, elige el Launch Template y selecciona subredes privadas en dos AZ distintas. Define capacidad mínima, deseada y máxima.', 'En Load balancing, adjunta el Target Group que ya creaste en la etapa 05: desde ahora el ASG registra y retira instancias en él automáticamente. Activa los health checks de Elastic Load Balancing y define el grace period.', 'En Scaling policies, elige Target tracking scaling policy con la métrica Average CPU utilization y un objetivo de 60%.'],
+    why: 'El ASG mantiene la capacidad deseada sin intervención: reemplaza instancias caídas y crece o decrece con la carga. Sobre dos AZ, si una zona falla, lanza los reemplazos en la otra.',
+    useCases: ['Reemplazo automático de una instancia que deja de responder.', 'Tráfico variable a lo largo del día sin pagar capacidad ociosa.', 'Escalado programado para picos conocidos, como un cierre de mes.'],
+    considerations: ['El máximo es tu freno de costo: sin un tope razonable, un pico o un bug puede lanzar decenas de instancias.', 'El escalado no es instantáneo: entre que sube la carga y que la instancia nueva recibe tráfico pasan varios minutos (tiempos exactos por verificar en cada caso).', 'La aplicación no debe guardar estado local; las sesiones en memoria se pierden al escalar.', 'En laboratorio se usa un objetivo bajo, como 20% de CPU, para ver el escalado rápido; en producción suele estar entre 60% y 75%.'],
+    deepDive: { title: 'Health check EC2 vs. ELB y el grace period', content: 'Con la verificación de salud por defecto (EC2), el ASG solo comprueba que la instancia esté running y pase los status checks. Si Apache muere pero la máquina sigue encendida, el ALB deja de enviarle tráfico por el health check del Target Group, pero el ASG la sigue contando como sana y nunca la reemplaza. Con ELB, el ASG usa ese mismo health check y la termina. El grace period es lo que espera antes de evaluar una instancia nueva: si es más corto que el arranque real de la aplicación, el ASG termina instancias que aún estaban iniciando y entra en un ciclo de creación y destrucción. Mídelo, no lo estimes; el valor por defecto depende de cómo crees el grupo (por verificar en la documentación vigente).' },
+  },
+  {
+    id: 'access', number: '07', title: 'Resolver acceso con Elastic IP y SSH', eyebrow: 'Operación segura',
     summary: 'Una IP pública dinámica cambia al detener la máquina. Elastic IP aporta una dirección estática.',
     how: ['Ve a EC2 > Elastic IPs > Allocate. Selecciona la dirección, abre Actions > Associate Elastic IP address y vincúlala a tu EC2 o interfaz de red.', 'Conecta usando el usuario de la AMI, la llave privada y la IP estática.', 'Tras una práctica, libera la IP si no está asociada para evitar cargos innecesarios.'],
     why: 'Scripts y accesos manuales no se rompen al reiniciar la instancia. En producción suele ser mejor usar DNS frente a una IP.',
@@ -68,12 +77,21 @@ const sections: GuideSection[] = [
     considerations: ['Elastic IP no cifra SSH ni reemplaza un firewall.', 'La llave debe tener permisos restrictivos en tu equipo.', 'Una Elastic IP pública sin asociación puede generar cargos; libera las que ya no uses.'],
   },
   {
-    id: 'server-deployment', number: '07', title: 'Configurar el servidor y desplegar', eyebrow: 'Entrega',
+    id: 'server-deployment', number: '08', title: 'Configurar el servidor y desplegar', eyebrow: 'Entrega',
     summary: 'El flujo de laboratorio instala Apache, lo deja persistente y publica el contenido en su Document Root.',
     how: ['Actualiza el sistema antes de instalar servicios.', 'Instala Apache, inicia el servicio y habilítalo para el próximo reinicio.', 'Copia el artefacto final a /var/www/html/ y valida desde el navegador o con curl.'],
     why: 'Separar instalación, arranque y despliegue hace visible qué parte falló. El comando enable es el que conserva el servicio después de reiniciar.',
     useCases: ['Aprender el ciclo completo de una página estática.', 'Validar conectividad entre SG, puerto 80 y Apache.', 'Sustituir edición manual por git clone, scp o un pipeline CI/CD.'],
     considerations: ['nano index.html es útil para aprender, pero no es reproducible.', 'No guardes secretos en el Document Root (/var/www/html/).'],
+  },
+  {
+    id: 'cloudfront-s3', number: '09', title: 'Entregar contenido estático con CloudFront y S3', eyebrow: 'Entrega de contenido',
+    summary: 'Tu aplicación ya responde directo. CloudFront pone una CDN delante: cachea el contenido en edge locations cercanas al usuario y el origen recibe muchas menos peticiones.',
+    how: ['Ve a S3 > Create bucket. Usa un nombre globalmente único con guiones y sin puntos, deja Block Public Access activado y Object Ownership en Bucket owner enforced. Sube el contenido estático.', 'Ve a CloudFront > Distributions > Create distribution y elige el bucket como origen. En Origin access, selecciona Origin access control settings y crea un OAC; después aplica en el bucket la política que CloudFront propone.', 'Para un dominio propio con HTTPS, solicita el certificado en AWS Certificate Manager (ACM) en la región us-east-1, agrégalo junto al Alternate domain name y usa Redirect HTTP to HTTPS como Viewer protocol policy.', 'En el cache behavior por defecto usa una política de caché administrada (como CachingOptimized) para estáticos; añade behaviors por patrón de ruta, por ejemplo /api/* sin caché hacia el ALB.'],
+    why: 'El bucket nunca queda expuesto: solo la distribución puede leerlo. Cada cache hit es una petición que no llega al origen ni al ALB, lo que también reduce cuánto necesita escalar el ASG.',
+    useCases: ['Sitio estático (HTML, CSS, JS, imágenes) servido desde un bucket privado.', 'Una sola distribución con /img/* hacia S3 y /api/* hacia el ALB.', 'HTTPS con dominio propio y certificado gratuito de ACM con renovación automática.'],
+    considerations: ['Hacer el bucket público para que CloudFront lo lea permite saltarse la CDN. Bucket privado + OAC.', 'Un certificado de ACM fuera de us-east-1 no aparece como opción en la distribución; para un ALB, el certificado va en la región del balanceador.', 'Versiona los nombres de archivo (logo.v2.png) en lugar de invalidar en cada despliegue: las invalidaciones tardan y, por encima de un cupo mensual gratuito, tienen costo (cifras por verificar en la página de precios).', 'Cifra también el tramo CloudFront a origen, no solo el del usuario.'],
+    deepDive: { title: 'Price Class: ahorrar sin perder la latencia que buscabas', content: 'La Price Class limita desde qué grupos de edge locations se sirve el contenido: All, 200 o 100. Reducirla baja el costo y no deja a nadie sin servicio: un usuario fuera de las regiones incluidas se atiende desde la edge location incluida más cercana, con más latencia. Si tu audiencia está en Colombia, revisa qué cubre cada clase antes de elegir: Sudamérica podría quedar fuera de las clases 100 y 200 (por verificar en la documentación vigente). Una clase reducida puede anular justo la ganancia de latencia que motivó usar la CDN.' },
   },
 ]
 
@@ -84,7 +102,7 @@ const commands = [
   { label: 'Publicar el contenido', code: 'cd /var/www/html/\nnano index.html' },
 ]
 
-const tocSections = [...sections, { id: 'commands', number: '08', title: 'Comandos, en el orden correcto' }]
+const tocSections = [...sections, { id: 'commands', number: '10', title: 'Comandos, en el orden correcto' }]
 
 function Icon({ name }: { name: 'copy' | 'check' | 'arrow' | 'network' | 'deep-dive' }) {
   if (name === 'check') return <svg aria-hidden="true" viewBox="0 0 20 20" className="size-4"><path d="m4 10 4 4 8-8" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" /></svg>
@@ -148,7 +166,7 @@ export function AWSArchitectureGuide() {
         <div className="mb-5 flex items-center gap-3 text-xs font-semibold tracking-[0.16em] text-accent uppercase"><Icon name="network" />AWS / arquitectura base</div>
         <h1 className="max-w-3xl text-4xl font-semibold tracking-[-0.04em] sm:text-6xl">De una VPC vacía a un despliegue verificable.</h1>
         <p className="mt-5 max-w-2xl text-base leading-8 text-foreground/70 sm:text-lg">Una guía práctica para conectar red, cómputo, seguridad y entrega. Primero entiende el recorrido; después profundiza en las decisiones que hacen que la arquitectura sea resistente.</p>
-        <div className="mt-7 flex flex-wrap gap-2 text-xs text-foreground/65"><span className="rounded-md border border-border px-3 py-1.5">8 etapas</span><span className="rounded-md border border-border px-3 py-1.5">Amazon Linux 2023</span><span className="rounded-md border border-border px-3 py-1.5">Laboratorio + producción</span></div>
+        <div className="mt-7 flex flex-wrap gap-2 text-xs text-foreground/65"><span className="rounded-md border border-border px-3 py-1.5">10 etapas</span><span className="rounded-md border border-border px-3 py-1.5">Amazon Linux 2023</span><span className="rounded-md border border-border px-3 py-1.5">Laboratorio + producción</span></div>
       </div></header>
 
       <div className="grid gap-10 lg:grid-cols-[14rem_minmax(0,1fr)] lg:gap-16">

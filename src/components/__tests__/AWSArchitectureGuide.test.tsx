@@ -45,15 +45,45 @@ describe('AWSArchitectureGuide', () => {
 
     render(<AWSArchitectureGuide />)
 
-    const runbookLink = screen.getByRole('link', { name: /08\s*comandos, en el orden correcto/i })
+    const runbookLink = screen.getByRole('link', { name: /10\s*comandos, en el orden correcto/i })
     expect(runbookLink).toHaveAttribute('href', '#commands')
-    expect(observe).toHaveBeenCalledTimes(8)
+    expect(observe).toHaveBeenCalledTimes(10)
 
     act(() => {
       callback?.([{ isIntersecting: true, intersectionRatio: 1, target: document.getElementById('commands')! } as unknown as IntersectionObserverEntry])
     })
 
     expect(runbookLink).toHaveAttribute('aria-current', 'location')
+  })
+
+  it('adds the Auto Scaling stage right after ALB and Target Groups', () => {
+    render(<AWSArchitectureGuide />)
+    const albLink = screen.getByRole('link', { name: /05\s*distribuir tráfico con alb/i })
+    const asgLink = screen.getByRole('link', { name: /06\s*escalar con auto scaling groups/i })
+    expect(asgLink).toHaveAttribute('href', '#auto-scaling-groups')
+    expect(albLink.compareDocumentPosition(asgLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByRole('link', { name: /07\s*resolver acceso/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /08\s*configurar el servidor/i })).toBeInTheDocument()
+
+    expect(screen.getByRole('heading', { name: /escalar con auto scaling groups/i })).toBeInTheDocument()
+    expect(screen.getByText(/EC2 > Launch Templates/i)).toBeInTheDocument()
+    expect(screen.getByText(/EC2 > Auto Scaling Groups/i)).toBeInTheDocument()
+    expect(screen.getByText(/Target tracking scaling policy/i)).toBeInTheDocument()
+    expect(screen.getByText(/verificación de salud por defecto \(EC2\)/i)).toBeInTheDocument()
+  })
+
+  it('adds the CloudFront + S3 stage before the command runbook', () => {
+    render(<AWSArchitectureGuide />)
+    const cdnLink = screen.getByRole('link', { name: /09\s*entregar contenido estático con cloudfront y s3/i })
+    expect(cdnLink).toHaveAttribute('href', '#cloudfront-s3')
+    const runbookLink = screen.getByRole('link', { name: /10\s*comandos/i })
+    expect(cdnLink.compareDocumentPosition(runbookLink) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    expect(screen.getByRole('heading', { name: /entregar contenido estático con cloudfront y s3/i })).toBeInTheDocument()
+    expect(screen.getByText(/Origin access control settings/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/us-east-1/i).length).toBeGreaterThan(0)
+    const tocEntries = screen.getAllByRole('link').filter((link) => link.getAttribute('href')?.startsWith('#'))
+    expect(screen.getByText(`${tocEntries.length} etapas`)).toBeInTheDocument()
   })
 
   it('keeps the mobile table of contents within the viewport', () => {

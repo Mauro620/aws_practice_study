@@ -10,18 +10,15 @@ type CourseModule = { id: string; label: string }
 
 export const COURSE_MODULES: { category: string; modules: CourseModule[] }[] = [
   {
-    category: 'Módulos AWS Cloud Architecture',
+    category: 'Módulos del curso',
     modules: [
       { id: 'bienvenida', label: 'M1 Le damos la bienvenida a AWS Academy Cloud Architecting' },
       { id: 'well-architected', label: 'M2 Marco de AWS Well-Architected' },
-      { id: 'iam', label: 'M3 Protección del acceso (AWS IAM)' },
-    ],
-  },
-  {
-    category: 'Recursos de clase/servicios en nube',
-    modules: [
-      { id: 'vpc', label: 'M1 Amazon VPC (Virtual Private Cloud)' },
-      { id: 'ec2', label: 'M2 Amazon EC2 (Elastic Compute Cloud)' },
+      { id: 'vpc', label: 'M3 Amazon VPC (Virtual Private Cloud)' },
+      { id: 'ec2', label: 'M4 Amazon EC2 (Elastic Compute Cloud)' },
+      { id: 'iam', label: 'M5 Protección del acceso (AWS IAM)' },
+      { id: 'elasticidad', label: 'M6 Elasticidad (Auto Scaling, Target Groups y CloudWatch)' },
+      { id: 'cloudfront', label: 'M7 Entrega de contenido (CloudFront, HTTPS y S3)' },
     ],
   },
 ]
@@ -76,6 +73,11 @@ function LearningNav({ servicios, pathname }: { servicios: ServicioMeta[]; pathn
           <li>
             <NavLink href="/guia-arquitectura" pathname={pathname}>
               Guía de arquitectura AWS
+            </NavLink>
+          </li>
+          <li>
+            <NavLink href="/arquitectura-referencia" pathname={pathname}>
+              Arquitectura de referencia
             </NavLink>
           </li>
           {HERRAMIENTAS_TRANSVERSALES.map((herramienta) => (

@@ -2,7 +2,7 @@
   "id": "vpc",
   "nombre": "Amazon VPC (Virtual Private Cloud)",
   "categoria": "Red",
-  "modulo": 1,
+  "modulo": 3,
   "prerequisitos": [],
   "resumenUnaLinea": "Tu propia red privada y aislada dentro de AWS: todo lo demás (EC2, RDS, Lambda...) vive dentro de una VPC.",
   "erroresFrecuentes": [

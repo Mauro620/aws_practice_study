@@ -1,0 +1,110 @@
+---
+titulo: AMI propia, Launch Template, dos AZ y target tracking al 60%
+---
+
+El caso mínimo mantenía dos instancias vivas. El caso realista les agrega lo que convierte eso en elasticidad: una **AMI propia** para que cada instancia nueva arranque lista, un **Launch Template** versionado, un **ASG sobre dos AZ con margen para crecer**, una política de **target tracking al 60% de CPU** y la verificación de salud **ELB** en lugar de la que viene por defecto.
+
+## 1. La AMI propia (golden image)
+
+El ASG no puede lanzar "una instancia vacía" y esperar a que se instale todo: durante esos minutos no serviría de nada. Necesita una plantilla ya lista.
+
+```
+1. Lanzás una instancia y la configurás completa
+   (servidor web, aplicación, servicios activos)
+2. Verificás que funciona
+3. Consola EC2 → Acciones → Imagen y plantillas → Crear imagen
+4. AWS toma un snapshot del volumen EBS y guarda los metadatos
+5. Queda una AMI con su propio ID: ami-0a1b2c3d4e5f6...
+```
+
+Todo lo que esté en el disco se replica en **cada instancia futura**. Antes de crear la imagen:
+
+- Eliminá claves SSH autorizadas y cualquier credencial que hayas dejado en las pruebas.
+- Vaciá logs, temporales y el historial de shell.
+- Habilitá los servicios para que arranquen solos (`systemctl enable`): nadie los va a iniciar a mano.
+- Verificá que la aplicación no dependa de la IP de esa instancia concreta.
+
+> Si la instancia origen tenía claves de acceso de IAM en un archivo, **todas las instancias creadas desde esa AMI las van a tener**. Los permisos se dan con un rol de IAM y un perfil de instancia, como en el [módulo IAM](/servicios/iam).
+
+| Incluye la AMI | No incluye la AMI |
+| --- | --- |
+| Sistema operativo y su configuración | IP pública o privada |
+| Software instalado y archivos del sistema | Etiquetas de la instancia original |
+| Mapeo de dispositivos de bloque | Contenido del Instance Store |
+| | Security Groups (van en el Launch Template) |
+
+**AMI y User Data se complementan.** La AMI trae lo pesado y estable (SO, runtime, dependencias); el User Data trae lo variable (descargar la última versión de la aplicación, configuración por entorno). La AMI arranca rápido pero hay que recrearla para cambiar algo; el User Data se edita fácil pero instala en el momento y alarga el arranque.
+
+## 2. El Launch Template
+
+Es la receta que el ASG usa para cada instancia: la AMI que acabás de crear, el tipo de instancia, el key pair, los Security Groups, el rol de IAM, el User Data, el almacenamiento y las etiquetas. Soporta **versiones**: podés publicar una versión nueva con otra AMI y revertir si algo sale mal.
+
+Existe también el *Launch Configuration*, el mecanismo anterior: inmutable y sin funciones nuevas. **Usá siempre Launch Template.**
+
+## 3. Target Group con un health check que diga la verdad
+
+| Parámetro | Qué define | Valor típico |
+| --- | --- | --- |
+| Protocolo y puerto | Cómo consultar | HTTP:80 |
+| Ruta | Qué URL pedir | `/health` |
+| Intervalo | Cada cuánto se consulta | 30 s |
+| Tiempo de espera | Cuánto espera la respuesta | 5 s |
+| Umbral de sano / no sano | Respuestas seguidas para cambiar de estado | 2 a 5 |
+| Código de éxito | Qué código HTTP cuenta como correcto | 200 |
+
+**Por qué `/health` y no `/`:** la raíz puede responder 200 aunque la base de datos esté caída. Un endpoint de salud bien hecho verifica las dependencias reales y devuelve error si alguna falla. Así el balanceador saca de rotación una instancia que técnicamente responde pero no puede trabajar.
+
+## 4. El ASG sobre dos AZ
+
+| Parámetro | Valor en este caso | Por qué |
+| --- | --- | --- |
+| Subredes | Dos privadas, en dos AZ | El grupo reparte las instancias entre AZ y, si una falla, lanza los reemplazos en la otra |
+| Mínimo | 2 | Una instancia por AZ incluso en la madrugada |
+| Deseada | 2 | Punto de partida; **es el número que la política modifica** |
+| Máximo | 6 | El freno de costo. Sin un tope razonable, un pico o un bug propio lanza decenas de instancias |
+| Verificación de salud | **ELB** | Ver abajo |
+
+### Verificación de salud: EC2 vs. ELB
+
+| Tipo | Qué comprueba | Consecuencia |
+| --- | --- | --- |
+| **EC2** (por defecto) | Que la instancia esté `running` y pase los status checks | Una instancia encendida con el servidor web caído se considera sana y **nunca se reemplaza** |
+| **ELB** | Lo anterior, más los health checks del Target Group | Si la aplicación deja de responder, el ASG la termina y lanza otra |
+
+Con balanceador delante, la opción correcta es ELB. Con la de por defecto, el balanceador deja de mandarle tráfico a la instancia rota, pero el ASG la sigue contando como sana: ocupa un lugar del grupo sin trabajar.
+
+El **grace period** acompaña a esta decisión: es el tiempo que el ASG espera tras lanzar una instancia antes de evaluar su salud. Tiene que ser mayor que lo que tarda en arrancar tu aplicación (el nivel siguiente explica qué pasa si no lo es).
+
+## 5. Target tracking al 60% de CPU
+
+Definís una métrica y un objetivo — `CPUUtilization` promedio del grupo al 60% — y AWS hace el resto: crea las alarmas de CloudWatch, calcula cuántas instancias hacen falta para volver al objetivo y mueve la capacidad deseada, siempre dentro del mínimo y el máximo.
+
+| Tipo de política | Cómo funciona | Cuándo usarla |
+| --- | --- | --- |
+| **Target tracking** | Mantiene una métrica en un valor objetivo | La opción por defecto: simple y eficaz |
+| **Step scaling** | Ajustes distintos según cuánto se supera el umbral | Cuando necesitás reaccionar más fuerte ante picos mayores |
+| **Simple scaling** | Un único ajuste por alarma, con cooldown | Heredada. Evitala |
+| **Scheduled** | Escala por calendario | Patrones conocidos: horario laboral, cierre de mes |
+| **Predictive** | Aprende patrones históricos y escala **antes** del pico | Cargas con estacionalidad clara |
+
+**Por qué 60% y no 20%.** En el laboratorio se usó un umbral del 20% para que el escalado se disparara rápido y se viera dentro de la clase: es una tolerancia baja a propósito. En producción nadie escala al 20% — sería lanzar instancias con el servidor casi ocioso. Los valores habituales rondan el 60–75%: dejan margen para absorber el pico mientras llega la capacidad nueva.
+
+## 6. CloudWatch: lo que mide y lo que no
+
+EC2 publica por defecto `CPUUtilization`, `NetworkIn`, `NetworkOut`, `DiskReadOps`, `DiskWriteOps` y `StatusCheckFailed`, cada **5 minutos**. Con *Detailed Monitoring* (de pago) baja a **1 minuto**, lo que importa si querés que el escalado reaccione rápido.
+
+> **Ni la memoria RAM ni el espacio en disco se miden por defecto.** Requieren instalar el **CloudWatch Agent** y se publican como métricas personalizadas. Es la limitación que más sorprende, porque muchas aplicaciones se saturan por memoria antes que por CPU.
+
+Una alarma pasa por tres estados — `OK`, `ALARM`, `INSUFFICIENT_DATA` — y se define con una estadística (promedio, máximo…), un periodo, un umbral y **cuántos periodos consecutivos** deben cruzarlo. Ese último parámetro evita el ruido: exigir 2 de 2 periodos impide que un pico de un segundo dispare un escalado innecesario.
+
+## El flujo completo
+
+```
+Usuario → ALB (subredes públicas, 2 AZ)
+            → Target Group: health check /health
+               → ASG (subredes privadas, 2 AZ): min 2 · deseada 2..6 · max 6
+                  instancias lanzadas desde Launch Template v3 → AMI propia
+            ← CloudWatch: CPUUtilization promedio del grupo, objetivo 60%
+```
+
+La carga sube → la CPU promedio pasa del 60% → la política sube la deseada → el ASG lanza instancias desde la AMI → pasan el grace period y los health checks → el ALB empieza a mandarles tráfico → la CPU promedio vuelve al objetivo.

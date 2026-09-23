@@ -2,7 +2,7 @@
   "id": "ec2",
   "nombre": "Amazon EC2 (Elastic Compute Cloud)",
   "categoria": "Cómputo",
-  "modulo": 1,
+  "modulo": 4,
   "prerequisitos": ["vpc"],
   "resumenUnaLinea": "El servicio de cómputo bajo demanda de AWS: servidores virtuales (instancias) que se crean en minutos y se pagan por tiempo de uso.",
   "erroresFrecuentes": [

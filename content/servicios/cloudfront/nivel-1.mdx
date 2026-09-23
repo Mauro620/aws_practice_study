@@ -1,0 +1,39 @@
+---
+titulo: Las tiendas de barrio y la bodega central
+---
+
+Imaginá una empresa que vende en todo el país desde una sola **bodega central** en la capital. Si cada cliente, esté donde esté, tuviera que viajar hasta la bodega para comprar una gaseosa, el sistema funcionaría — pero cada compra tardaría horas, la bodega viviría colapsada y medio país dejaría de comprar.
+
+Lo que hace cualquier cadena real es otra cosa: pone **tiendas de barrio** cerca de la gente. La bodega las abastece, y cada tienda guarda en su estante lo que más se vende en su zona. El cliente camina dos cuadras, compra y se va. La bodega ni se entera de esa compra.
+
+Esa es la idea completa de una **CDN** (Content Delivery Network), y **Amazon CloudFront** es la de AWS. No acelera el servidor: **acerca el contenido al usuario**.
+
+## Por qué no alcanza con un servidor más potente
+
+La latencia tiene un límite físico. Un paquete no viaja más rápido que la luz en la fibra, y entre Medellín y Virginia hay miles de kilómetros. Una bodega más grande no acorta el viaje del cliente: lo que lo acorta es una tienda más cerca.
+
+## Los personajes de la cadena
+
+| En la cadena de tiendas | En CloudFront | Función |
+| --- | --- | --- |
+| **La tienda de barrio** | Edge location | Primera línea: es donde llega el usuario. Hay muchas más que regiones de AWS, incluso en países donde AWS no tiene región |
+| **El depósito regional** | Regional edge cache | Segunda línea, con más capacidad: guarda lo que ya salió del estante de la tienda pero todavía se pide |
+| **La bodega central** | Origen | Donde vive el contenido real: un bucket de S3, un ALB o un servidor |
+| **La fecha de reposición del estante** | TTL | Cuánto tiempo la tienda conserva un producto antes de volver a preguntarle a la bodega |
+
+## Lo que pasa con cada compra
+
+- **El producto está en el estante (cache hit):** la tienda lo entrega al instante. La bodega no se entera de que existió esa compra.
+- **El producto no está (cache miss):** la tienda lo pide al depósito regional; si tampoco lo tiene, a la bodega. La primera compra es lenta, pero deja el producto en el estante para los siguientes clientes del barrio.
+
+**Las dos consecuencias que importan:** el cliente recibe más rápido, y la bodega recibe muchísimos menos pedidos. La segunda es tan importante como la primera — menos carga en el origen es menos costo y menos necesidad de escalar el backend.
+
+## La bodega no atiende al público
+
+En una cadena bien armada, la bodega central **no tiene puerta a la calle**. Solo abastece a las tiendas de la cadena: si un cliente se presenta directo en la bodega, no lo atienden. Si lo atendieran, cualquiera se saltaría las tiendas, la bodega volvería a colapsar y la empresa perdería el control de quién compra qué.
+
+En AWS, eso es el **bucket de S3 privado detrás de CloudFront**: el bucket no es público, y solo acepta pedidos que llegan firmados por la distribución de CloudFront. Es la idea que sostiene todo el módulo.
+
+## Y el sello en la puerta
+
+Una tienda tiene en la puerta el **sello de la franquicia**, emitido por la casa matriz: le prueba al cliente que esa tienda es realmente de la cadena y no un local falso con el mismo logo. En la web, ese sello es el **certificado TLS**, y la casa matriz que lo respalda es una **autoridad certificadora**. HTTPS no solo cifra: también prueba con quién estás hablando.

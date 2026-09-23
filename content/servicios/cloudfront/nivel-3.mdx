@@ -1,0 +1,115 @@
+---
+titulo: Dominio propio, ACM, OAC, dos comportamientos de caché y un bucket con memoria
+---
+
+El caso mínimo servía un sitio estático desde `d1a2b3c4d5e6f7.cloudfront.net`. El caso realista es la cafetería con su propio dominio, contenido estático y una API dinámica detrás de la misma distribución, HTTPS en todo el trayecto y un bucket que no pierde lo que alguien borra por error.
+
+```
+                        Usuario
+                           │
+                      [ Route 53 ]
+                 cafeteria.com → ALIAS
+                           │
+                  [ CloudFront ]  ← certificado ACM (us-east-1)
+                   Shield Standard     Redirect HTTP → HTTPS
+                           │
+            ┌──────────────┴──────────────┐
+     /img/*  /css/*  /js/*              /api/*
+            │                             │
+    [ Bucket S3 PRIVADO ]         [ ALB público ]
+      acceso vía OAC                      │
+      versionado activo           [ EC2 en subredes
+      reglas de ciclo de vida       privadas, ASG ]
+```
+
+Cada elección de este diagrama responde a un módulo anterior: las subredes privadas al [de VPC](/servicios/vpc), el ASG detrás del ALB al [de Elasticidad](/servicios/elasticidad), la política de bucket y los roles al [de IAM](/servicios/iam).
+
+## 1. Dominio propio con Route 53
+
+Se declara el nombre como **alternate domain name** (CNAME alternativo) en la distribución y se apunta el DNS hacia ella.
+
+| Camino | Registro | Dominio raíz (`cafeteria.com`) |
+| --- | --- | --- |
+| **Route 53** | **ALIAS** hacia la distribución | ✅ Funciona |
+| DNS de terceros | CNAME hacia `d1a2….cloudfront.net` | ❌ Un CNAME no puede ir en el dominio raíz |
+
+El registro ALIAS es propio de Route 53: funciona en el dominio raíz y las consultas hacia recursos de AWS no se cobran.
+
+## 2. El certificado con ACM
+
+Para usar un dominio propio con HTTPS, la distribución **necesita un certificado que cubra ese nombre**. Dentro de AWS, la respuesta es **AWS Certificate Manager (ACM)**:
+
+- **Gratuito** para certificados usados con servicios integrados de AWS.
+- **Renovación automática:** elimina el clásico sitio caído por certificado vencido.
+- La clave privada la gestiona AWS y **no la descargás** — es una ventaja de seguridad, no una limitación *(por verificar: ACM incorporó una opción de certificados públicos exportables, con costo; el certificado estándar sigue sin exportarse)*.
+- Validación por **DNS** (recomendada: con Route 53 se crea el registro con un clic y la renovación sigue sola) o por correo.
+
+Para la cafetería se pide **un solo certificado** que declare `cafeteria.com` y `*.cafeteria.com`. Hacen falta los dos nombres: el wildcard solo no cubre el dominio raíz (el nivel siguiente explica por qué).
+
+Y un requisito que no admite excepciones: **para CloudFront, el certificado se solicita en `us-east-1` (Norte de Virginia)**, aunque el resto de la infraestructura esté en otra región.
+
+## 3. HTTPS en los dos tramos
+
+| Tramo | Política | Valor en este caso |
+| --- | --- | --- |
+| Usuario → CloudFront | Viewer protocol policy | **Redirect HTTP to HTTPS** |
+| CloudFront → ALB | Origin protocol policy | **HTTPS only** (el ALB tiene su propio certificado de ACM, en *su* región) |
+| CloudFront → S3 | Petición firmada por OAC | Por HTTPS |
+
+Cifrar solo la primera mitad deja la segunda viajando en claro. HTTPS da tres garantías — **confidencialidad**, **integridad** y **autenticidad** — y la tercera es la que justifica todo el sistema de certificados: cifrar es fácil; saber *con quién* estás cifrando es lo difícil.
+
+## 4. Dos comportamientos de caché: estático y dinámico
+
+Una misma distribución puede tener varios orígenes. Los **cache behaviors** deciden, por patrón de ruta, a qué origen va cada petición y cómo se cachea:
+
+| Patrón | Origen | Caché | Por qué |
+| --- | --- | --- | --- |
+| `/api/*` | ALB | **Sin caché** (política administrada `CachingDisabled`) | Las respuestas dependen del usuario y cambian en cada petición |
+| `/img/*`, `/css/*`, `/js/*` | Bucket S3 (OAC) | TTL largo (política administrada `CachingOptimized`) | Cambian solo con un despliegue |
+| Por defecto (`*`) | Bucket S3 (OAC) | TTL largo | El resto del sitio estático |
+
+Para publicar una versión nueva del CSS, **no se invalida: se versiona el nombre** (`estilos.v7.css`). Cambiar el nombre es instantáneo y gratis; invalidar tarda en propagarse y, pasado cierto volumen, se cobra.
+
+El ALB detrás de `/api/*` también gana con esto: las peticiones estáticas nunca le llegan, así que necesita escalar mucho menos.
+
+## 5. El bucket con versionado y ciclo de vida
+
+**Versionado:** cada escritura crea una versión nueva en lugar de sobrescribir. Al borrar un objeto, S3 no lo elimina: coloca un **delete marker** que lo oculta, y quitando el marcador el objeto vuelve.
+
+| Estado | Comportamiento |
+| --- | --- |
+| Deshabilitado | Estado inicial |
+| Habilitado | Cada escritura crea una versión nueva |
+| Suspendido | Deja de versionar pero **conserva** las versiones anteriores |
+
+**Una vez habilitado, no se puede volver a deshabilitar: solo suspender.**
+
+Cada versión ocupa espacio y **se factura por separado**: un archivo de 1 GB modificado diez veces son 10 GB. Por eso el versionado se combina siempre con **reglas de ciclo de vida**, que pueden tratar distinto a la versión actual y a las anteriores:
+
+```
+Versión actual       → S3 Standard (es el origen de CloudFront)
+Versiones anteriores → a Standard-IA a los 30 días
+                     → eliminadas a los 90 días
+Prefijo backups/     → Standard → Glacier Flexible Retrieval a los 90 días
+                     → eliminados a los 365 días
+```
+
+## 6. Elegir la clase de almacenamiento
+
+La regla general: **cuanto más barato guardar, más caro o lento recuperar**. La durabilidad de once nueves es la misma en todas las clases; lo que cambia es la disponibilidad, el costo de acceso y la latencia — salvo One Zone-IA, que vive en una sola AZ y queda expuesta a la pérdida de esa zona.
+
+| Clase | Patrón de acceso | Recuperación | En la cafetería |
+| --- | --- | --- | --- |
+| **S3 Standard** | Frecuente | Inmediata | Imágenes y CSS del sitio: origen de CloudFront |
+| **Intelligent-Tiering** | Desconocido o variable | Inmediata | Fotos subidas por clientes, sin patrón claro |
+| **Standard-IA** | Poco frecuente | Inmediata | Versiones anteriores, backups recientes |
+| **One Zone-IA** | Poco frecuente, dato reproducible | Inmediata | Miniaturas que se pueden regenerar |
+| **Glacier Instant Retrieval** | Raro, pero debe llegar ya | Milisegundos | Facturas de años anteriores que se consultan poco |
+| **Glacier Flexible Retrieval** | Muy raro | Minutos a horas | Archivado |
+| **Glacier Deep Archive** | Casi nunca | Horas *(hasta 12 h en la recuperación estándar, por verificar)* | Retención legal de largo plazo |
+
+## 7. La seguridad que ya viene incluida
+
+- **AWS Shield Standard** está activo sin costo en CloudFront y Route 53, contra DDoS de capas 3 y 4.
+- **AWS WAF** se puede agregar a la distribución para filtrar por reglas de capa 7 (inyección SQL, límites de tasa, reputación de IP).
+- La CDN mitiga DDoS por diseño: reparte la carga entre muchas edge locations, absorbe en el borde lo que está cacheado y, con OAC, **oculta el origen**.

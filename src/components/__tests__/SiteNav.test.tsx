@@ -18,6 +18,8 @@ const serviceNames = {
   iam: 'Protección del acceso (AWS IAM)',
   vpc: 'Amazon VPC (Virtual Private Cloud)',
   ec2: 'Amazon EC2 (Elastic Compute Cloud)',
+  elasticidad: 'Elasticidad (Auto Scaling, Target Groups y CloudWatch)',
+  cloudfront: 'Entrega de contenido (CloudFront, HTTPS y S3)',
 }
 
 const servicios = Object.keys(serviceNames).map((id, index) => ({
@@ -33,6 +35,16 @@ const servicios = Object.keys(serviceNames).map((id, index) => ({
 }))
 
 describe('SiteNav', () => {
+  it('lists all seven modules in logical order, ending with IAM, Elasticidad and Entrega de contenido as M5, M6, M7', () => {
+    const group = COURSE_MODULES.find(({ modules }) => modules.some(({ id }) => id === 'iam'))!
+    const ids = group.modules.map(({ id }) => id)
+    expect(ids).toEqual(['bienvenida', 'well-architected', 'vpc', 'ec2', 'iam', 'elasticidad', 'cloudfront'])
+    const iamIndex = ids.indexOf('iam')
+    expect(group.modules[iamIndex].label).toMatch(/^M5 /)
+    expect(group.modules[iamIndex + 1].label).toMatch(/^M6 /)
+    expect(group.modules[iamIndex + 2].label).toMatch(/^M7 /)
+  })
+
   it('renders the requested learning categories, labels, and routes', () => {
     render(<SiteNav servicios={servicios} />)
 
@@ -52,6 +64,8 @@ describe('SiteNav', () => {
     expect(screen.getAllByRole('heading', { name: 'Guía transversal', level: 2 })).toHaveLength(2)
     expect(screen.getAllByRole('link', { name: 'Guía de arquitectura AWS' })).toHaveLength(2)
     expect(screen.getAllByRole('link', { name: 'Guía de arquitectura AWS' }).every((link) => link.getAttribute('href') === '/guia-arquitectura')).toBe(true)
+    expect(screen.getAllByRole('link', { name: 'Arquitectura de referencia' })).toHaveLength(2)
+    expect(screen.getAllByRole('link', { name: 'Arquitectura de referencia' }).every((link) => link.getAttribute('href') === '/arquitectura-referencia')).toBe(true)
 
     for (const herramienta of HERRAMIENTAS_TRANSVERSALES) {
       const links = screen.getAllByRole('link', { name: herramienta.label })

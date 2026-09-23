@@ -28,13 +28,7 @@ Una sola instancia en una sola AZ es un prototipo, no una arquitectura. En produ
             └────────────────────────┘
 ```
 
-Tres servicios que cambian el juego cuando aparecen juntos:
-
-| Servicio | Qué resuelve | Cómo se relaciona con EC2 |
-| --- | --- | --- |
-| **Auto Scaling Group (ASG)** | Mantener un número sano de instancias y reemplazar las que caen | Usa un **Launch Template** para crear instancias EC2 cuando hace falta; las termina cuando sobran |
-| **Elastic Load Balancer (ALB)** | Distribuir tráfico entre instancias en distintas AZ | La **target group** apunta al ASG, no a instancias puntuales |
-| **Launch Template** | Plantilla declarativa con AMI, tipo, SG, Key Pair y User Data | Es lo que consume el ASG; **garantiza que cada nueva instancia sea idéntica** a las anteriores |
+El ALB, el Auto Scaling Group y el Launch Template del diagrama tienen su propio módulo: cómo se reparten el tráfico, cuándo crecen y cómo se reemplazan las instancias está en [Elasticidad](/servicios/elasticidad).
 
 #### Modelos de compra, uno por uno
 

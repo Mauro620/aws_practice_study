@@ -7,7 +7,7 @@ describe('getServicio', () => {
 
     expect(servicio.id).toBe('vpc')
     expect(servicio.categoria).toBe('Red')
-    expect(servicio.modulo).toBe(1)
+    expect(servicio.modulo).toBe(3)
     expect(servicio.niveles.length).toBeGreaterThan(0)
 
     const numeros = servicio.niveles.map((n) => n.numero)
@@ -28,6 +28,50 @@ describe('getServicio', () => {
     // The brief requires omitting a level rather than restating content —
     // so a service is allowed to ship with fewer than 4 levels.
     expect(servicio.niveles.length).toBeLessThanOrEqual(4)
+  })
+})
+
+describe('módulos de elasticidad y entrega de contenido', () => {
+  it.each([
+    ['elasticidad', 6, ['vpc', 'ec2']],
+    ['cloudfront', 7, ['vpc', 'ec2', 'iam']],
+  ])('%s carga los cuatro niveles, su número de módulo y sus prerrequisitos', (id, modulo, prerequisitos) => {
+    const servicio = getServicio(id)
+
+    expect(servicio.modulo).toBe(modulo)
+    expect(servicio.prerequisitos).toEqual(prerequisitos)
+    expect(servicio.niveles.map((n) => n.numero)).toEqual([1, 2, 3, 4])
+    expect(servicio.erroresFrecuentes.length).toBeGreaterThan(0)
+    expect(servicio.glosario.length).toBeGreaterThan(0)
+    for (const nivel of servicio.niveles) {
+      expect(nivel.titulo.length).toBeGreaterThan(0)
+      expect(nivel.contenido.trim().length).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe('mapa de dependencias entre módulos', () => {
+  it('ordena la secuencia pedagógica Bienvenida → Well-Architected → VPC → EC2 → IAM → Elasticidad → Entrega de contenido', () => {
+    const modulo = (id: string) => getServicio(id).modulo
+    expect([
+      modulo('bienvenida'),
+      modulo('well-architected'),
+      modulo('vpc'),
+      modulo('ec2'),
+      modulo('iam'),
+      modulo('elasticidad'),
+      modulo('cloudfront'),
+    ]).toEqual([1, 2, 3, 4, 5, 6, 7])
+  })
+
+  it('todo prerrequisito apunta a un módulo existente', () => {
+    const servicios = getAllServicios()
+    const ids = new Set(servicios.map((s) => s.id))
+    for (const servicio of servicios) {
+      for (const prerequisito of servicio.prerequisitos) {
+        expect(ids.has(prerequisito), `${servicio.id} → ${prerequisito}`).toBe(true)
+      }
+    }
   })
 })
 

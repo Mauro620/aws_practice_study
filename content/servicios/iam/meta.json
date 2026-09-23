@@ -2,7 +2,7 @@
   "id": "iam",
   "nombre": "Protección del acceso (AWS IAM)",
   "categoria": "Seguridad",
-  "modulo": 3,
+  "modulo": 5,
   "prerequisitos": ["well-architected"],
   "resumenUnaLinea": "IAM controla quién puede hacer qué sobre los recursos de AWS: usuarios, grupos, roles y las políticas JSON que deciden, por reglas fijas, si una solicitud se permite o se deniega.",
   "erroresFrecuentes": [

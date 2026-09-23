@@ -1,0 +1,100 @@
+---
+titulo: El retraso real, el grace period, el estado local y los costos que quedan
+---
+
+El nivel anterior describe el flujo como si cada paso siguiera al anterior sin fricción. En la realidad hay minutos de retraso, parámetros que se pisan entre sí y costos que siguen corriendo cuando ya apagaste todo. Acá están los bordes que más se preguntan y los que más cuestan.
+
+## El escalado no es instantáneo
+
+La secuencia que se observa en el laboratorio de prueba de carga, con tiempos aproximados:
+
+```
+t=0       Se lanza la carga. La CPU de la instancia sube a ~100%
+t+1..5    CloudWatch recoge el dato (5 min por defecto,
+          1 min con Detailed Monitoring) → la alarma pasa a ALARM
+t+~6      El ASG sube la capacidad deseada
+t+~7      Se lanzan las instancias nuevas desde la AMI
+t+~9      Pasan los health checks: el Target Group las marca healthy
+t+~10     El ALB empieza a mandarles tráfico
+```
+
+Los minutos exactos dependen de la resolución de las métricas, de cuántos periodos exige la alarma y de cuánto tarda en arrancar tu aplicación *(los tiempos de la tabla son ilustrativos, por verificar en cada caso)*. Lo que no cambia es la conclusión: **entre que sube la carga y que la capacidad nueva sirve tráfico pasan varios minutos.**
+
+Tres consecuencias de diseño:
+
+- **El objetivo de target tracking tiene que dejar margen.** Al 60% las instancias existentes absorben el pico mientras llegan las nuevas; al 90% ya están saturadas antes de que el escalado reaccione.
+- **Una AMI con todo instalado arranca mucho antes** que una instancia que instala paquetes por User Data en cada lanzamiento.
+- **Para picos previsibles, no reacciones: adelantate.** Para eso existen el escalado programado (el cierre de mes, el horario laboral) y el predictivo (patrones históricos).
+
+## El cooldown y por qué el scale in es conservador
+
+Tras una acción de escalado, el **cooldown** impide otra durante un tiempo. Existe porque las instancias nuevas tardan en absorber carga: sin él, el ASG vería la CPU todavía alta y lanzaría más instancias de las necesarias.
+
+El *scale in* (quitar instancias) es deliberadamente **más conservador** que el *scale out*. La asimetría es de riesgo: una instancia de más cuesta unos centavos durante unos minutos; una de menos puede tumbar el servicio justo cuando la carga vuelve. Por eso las políticas suelen exigir que la métrica esté baja durante más tiempo antes de reducir. Y por eso usar **el mismo umbral para subir y para bajar** es un error: el grupo oscila sin parar entre crear y destruir.
+
+Cuando hay que eliminar una instancia, las **políticas de terminación** eligen cuál; por defecto el ASG prioriza mantener equilibradas las AZ. Antes de terminarla, el balanceador aplica el **deregistration delay**: deja de mandarle peticiones nuevas y espera a que terminen las que estaban en curso, 300 segundos por defecto. Si tu aplicación atiende peticiones cortas, bajarlo (a 30 s, por ejemplo) acelera bastante el scale in.
+
+## El grace period mal calibrado
+
+El grace period es el tiempo que el ASG espera tras lanzar una instancia antes de evaluar su salud. Si es **más corto que el arranque de tu aplicación**, pasa esto:
+
+```
+Lanza instancia → la evalúa antes de que el servidor web arranque
+→ falla el health check ELB → la marca no sana → la termina
+→ lanza otra para mantener la deseada → la evalúa demasiado pronto → ...
+```
+
+Un ciclo infinito de creación y destrucción, con la factura corriendo y el servicio sin crecer. El síntoma en la consola es una actividad del ASG llena de lanzamientos y terminaciones seguidas. La regla: grace period **mayor** que el tiempo real de arranque, medido, no estimado. El valor por defecto depende de cómo crees el grupo *(por verificar en la documentación vigente)*; no lo dejes al azar.
+
+## Aplicaciones con estado local
+
+El escalado horizontal supone que cualquier instancia puede atender cualquier petición. Si la aplicación guarda **sesiones en memoria** o **archivos en el disco de la instancia**, eso deja de ser cierto:
+
+| Situación | Qué ve el usuario |
+| --- | --- |
+| El ALB lo manda a otra instancia | Pierde la sesión: vuelve a pedirle login o se vacía su carrito |
+| El scale in termina su instancia | Pierde todo lo que estaba en esa instancia |
+| Un archivo subido quedó en el disco de una instancia | Las demás no lo encuentran |
+
+Las *sticky sessions* del balanceador atan a un usuario a una instancia y disimulan el síntoma, pero no lo resuelven: si esa instancia se termina, la sesión se pierde igual y la carga queda mal repartida. La solución de fondo es sacar el estado de la instancia: sesiones en ElastiCache o DynamoDB, archivos en S3, datos en RDS. Recién ahí las instancias pasan a ser ganado y no mascotas, como pide el [marco Well-Architected](/servicios/well-architected).
+
+## Instancias T y créditos de CPU
+
+Las familias `t2`, `t3`, `t3a` y `t4g` son de ráfaga: rinden bajo un nivel base y acumulan créditos para superarlo en picos (el detalle está en el [módulo EC2](/servicios/ec2)). Una prueba de carga sostenida — o un grupo que escala por CPU sobre instancias T — choca con eso de dos maneras:
+
+- En modo **standard**, al agotarse los créditos la instancia queda limitada al rendimiento base: la CPU medida deja de reflejar la demanda y el escalado se comporta raro.
+- En modo **unlimited**, la instancia sigue rindiendo por encima del base, pero ese exceso **se cobra aparte**. Qué modo trae cada familia por defecto *(por verificar: difiere entre `t2` y las generaciones posteriores)*.
+
+Para carga sostenida y para grupos que escalan por CPU, las familias M o C son la opción coherente. Podés comparar familias en el [explorador de tipos de instancia EC2](/herramientas/ec2).
+
+## El costo que queda después de limpiar
+
+Con créditos limitados, la limpieza importa tanto como el laboratorio:
+
+```
+1. Detener la carga (pkill yes)
+2. Poner el ASG en mínimo 0 y deseada 0 → elimina las instancias
+3. Eliminar el Auto Scaling Group
+4. Eliminar el Load Balancer y el Target Group
+5. Eliminar la AMI Y los snapshots que la respaldan
+6. Liberar Elastic IPs sin asociar
+```
+
+El paso 5 se olvida siempre. **Una AMI respaldada por EBS sigue cobrando** por su snapshot aunque nunca lances nada desde ella. Y **eliminar (desregistrar) la AMI no borra el snapshot**: si no lo borrás aparte, el cargo sigue activo cada mes. Los montos concretos dependen del tamaño del snapshot y de la región *(por verificar en la calculadora de precios de AWS)*.
+
+## Un detalle del laboratorio: `yes` satura un solo núcleo
+
+`yes > /dev/null` imprime `y` sin parar y consume el 100% de **un** vCPU. En una instancia de 2 vCPU produce alrededor de **50% de CPU total**, no 100%. Para saturar todos los núcleos hay que lanzar un proceso por núcleo:
+
+```bash
+nproc                                          # cuántos núcleos hay
+for i in $(seq $(nproc)); do yes > /dev/null & done
+pkill yes                                      # para detenerlos
+```
+
+## Cómo conecta con el resto del curso
+
+- **Con VPC:** el ASG necesita subredes en varias AZ. Es la razón práctica de ese diseño.
+- **Con EC2:** AMI, tipo de instancia, User Data y rol de IAM son las piezas del Launch Template.
+- **Con IAM:** las instancias reciben permisos por rol, nunca por credenciales dentro de la AMI.
+- **Con Entrega de contenido:** el caché en el borde reduce las peticiones que llegan al ALB, así que una buena configuración de CloudFront **disminuye cuánto necesitás escalar**. Una capa absorbe, la otra crece. Seguí en el [módulo de Entrega de contenido](/servicios/cloudfront).

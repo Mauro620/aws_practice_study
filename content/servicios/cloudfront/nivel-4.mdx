@@ -1,0 +1,98 @@
+---
+titulo: us-east-1, el wildcard que no cubre, las invalidaciones y las price classes
+---
+
+El caso realista funciona. Estos son los bordes donde se pierde tiempo en la consola, plata en la factura y puntos en el examen.
+
+## El certificado para CloudFront vive en `us-east-1`
+
+Un certificado de ACM para usar con **CloudFront se solicita en la región `us-east-1` (Norte de Virginia)**, sin importar dónde esté el resto de tu infraestructura. CloudFront es un servicio global y toma sus certificados de esa región.
+
+| Servicio que usa el certificado | Región donde se pide en ACM |
+| --- | --- |
+| **CloudFront** | **Siempre `us-east-1`** |
+| **ALB** | La misma región del balanceador |
+
+El síntoma del error es silencioso: pedís el certificado en `sa-east-1` porque ahí está tu ALB, vas a la distribución y **el certificado no aparece en la lista para seleccionar**. No hay mensaje de error: simplemente no está. Si tu arquitectura tiene CloudFront delante de un ALB en otra región, necesitás **dos certificados**: uno en `us-east-1` para la distribución y otro en la región del ALB para el tramo CloudFront → origen.
+
+## Lo que un wildcard no cubre
+
+`*.miapp.com` cubre **todos los subdominios de un solo nivel**, y nada más:
+
+| Nombre | ¿Lo cubre `*.miapp.com`? | Por qué |
+| --- | --- | --- |
+| `www.miapp.com` | ✅ | Un nivel |
+| `api.miapp.com` | ✅ | Un nivel |
+| `miapp.com` | ❌ | El dominio raíz no tiene nada donde va el asterisco |
+| `api.v2.miapp.com` | ❌ | **Dos niveles**: el asterisco reemplaza exactamente una etiqueta |
+| `otrodominio.com` | ❌ | Otro dominio |
+
+Por eso lo habitual es un certificado con **dos nombres**: `miapp.com` y `*.miapp.com`. Y si hace falta `api.v2.miapp.com`, se agrega explícitamente o se suma `*.v2.miapp.com`.
+
+| | Wildcard | SAN (lista de nombres) |
+| --- | --- | --- |
+| Cubre | Todos los subdominios de un nivel | Solo los nombres listados |
+| Dominios distintos | ❌ | ✅ |
+| Subdominio nuevo | Automático | Requiere reemitir el certificado |
+
+ACM permite combinar ambos en un mismo certificado.
+
+## Invalidar cuesta; versionar no
+
+Una **invalidación** borra objetos del caché de las edge locations antes de que expire su TTL. Tiene dos costos:
+
+- **Tiempo:** tarda en propagarse a todas las edge locations; no es instantánea.
+- **Dinero:** un cupo de rutas invalidadas por mes es gratuito y, por encima, se cobra por ruta *(el tamaño del cupo gratuito y el precio por ruta: por verificar en la página de precios vigente de CloudFront)*.
+
+Un comodín como `/img/*` cuenta como una ruta, aunque afecte miles de objetos *(por verificar)*. Aun así, invalidar en cada despliegue es un antipatrón: lo correcto es **versionar los nombres** (`logo.v2.png`, `app.3f9a1c.js`). Un nombre nuevo es un objeto nuevo: no hay nada que invalidar y el cambio es inmediato.
+
+## Price classes: dónde se sirve cambia cuánto se paga
+
+La transferencia de salida de CloudFront se cobra por GB, y **el precio varía según la región geográfica de la edge location** que atiende al usuario. Las price classes limitan qué grupos de edge locations usa la distribución:
+
+| Clase | Alcance | Costo |
+| --- | --- | --- |
+| **All** | Todas las edge locations | El más alto |
+| **200** | Excluye las ubicaciones más caras | Intermedio |
+| **100** | Solo las regiones más baratas (principalmente Norteamérica y Europa) | El más bajo |
+
+Limitar la clase **no deja a nadie sin servicio**: un usuario fuera de las regiones incluidas se atiende desde la edge location incluida más cercana, con más latencia. El borde a vigilar si la audiencia está en Colombia: la composición exacta de cada clase cambia con el tiempo, y **Sudamérica podría quedar fuera de las clases 100 y 200** *(por verificar en la documentación vigente antes de elegir)*. Elegir una clase reducida para ahorrar puede anular justo la ganancia de latencia que motivó usar la CDN.
+
+También cuestan: las peticiones HTTPS algo más que las HTTP, y funciones adicionales como Lambda@Edge, CloudFront Functions o los registros en tiempo real. CloudFront tiene además un volumen mensual de transferencia y peticiones sin costo *(cifras por verificar en la calculadora de precios)*.
+
+## CloudFront vs. replicación entre regiones
+
+Las dos "acercan" los datos, y por eso se confunden en el examen:
+
+| | CloudFront | Replicación entre regiones (CRR) |
+| --- | --- | --- |
+| Qué resuelve | Latencia de lectura para una audiencia dispersa | Pérdida de una región, residencia de datos, requisitos legales |
+| Cómo | Copia en caché en el borde, con TTL | Copia completa y persistente en otro bucket |
+| Costo | Transferencia y peticiones | Almacenamiento duplicado más transferencia entre regiones |
+
+**Contenido de solo lectura con audiencia dispersa → CloudFront.** CRR es la respuesta solo si el enunciado habla de disaster recovery, residencia de datos o cumplimiento.
+
+## Lo que el versionado protege y lo que no
+
+| Mecanismo | Protege contra | **No** protege contra |
+| --- | --- | --- |
+| Durabilidad de once nueves de S3 | Pérdida técnica: falla de hardware o de una AZ | Borrado o sobrescritura por error |
+| **Versionado** | Sobrescritura y borrado accidentales (delete marker) | Pérdida de la región completa; alguien que borra deliberadamente **versiones** específicas |
+| **CRR** | Pérdida de una región | Borrados, según cómo esté configurada la replicación *(qué borrados se replican: por verificar)* |
+
+Borrar un objeto versionado sin indicar versión solo agrega un delete marker. Pero **borrar una versión concreta sí la elimina de forma permanente**, y el versionado no evita eso: quien tenga permiso para borrar versiones puede borrar el historial. Para blindarlo existen controles adicionales (como MFA Delete u Object Lock) *(detalle de alcance: por verificar)*.
+
+## Dos correcciones que vale la pena fijar
+
+- **En el handshake TLS, el servidor envía su certificado al cliente**, no al revés. El cliente solo presenta certificado en *mutual TLS*, un escenario poco común. Y el sistema es **híbrido**: la criptografía asimétrica se usa solo para autenticar y acordar una clave; el resto de la sesión viaja con cifrado simétrico, mucho más rápido.
+- **EBS no puede ser origen de CloudFront.** Es un disco atado a una instancia, sin endpoint HTTP. Solo llega a serlo indirectamente, a través del servidor web de la instancia que lo monta.
+
+## Nombres de bucket: globales e inmutables
+
+El nombre de un bucket es **único en todo AWS**, no solo en tu cuenta, y **no se puede cambiar**: "renombrar" es crear otro bucket y copiar todo. Entre 3 y 63 caracteres, minúsculas, números, guiones y puntos. Evitá los puntos en buckets que se sirven por HTTPS: generan conflictos con el certificado del endpoint de S3.
+
+## Cómo conecta con el resto del curso
+
+- **Con VPC y EC2:** el ALB público y las instancias en subredes privadas son el origen dinámico de la distribución.
+- **Con IAM:** la política de bucket que habilita OAC es una política basada en recursos, con `Principal` y una condición atada a una distribución concreta.
+- **Con Elasticidad:** cada petición que se resuelve en el borde es una petición que el ASG no tiene que absorber. Una capa absorbe, la otra crece.

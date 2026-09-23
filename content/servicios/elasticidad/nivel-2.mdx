@@ -1,0 +1,53 @@
+---
+titulo: Dos instancias detrás de un balanceador, sin políticas
+---
+
+El caso mínimo de elasticidad todavía no escala nada. Es un **ASG de tamaño fijo — dos instancias — detrás de un Application Load Balancer**, sin ninguna política de escalado. Parece poco, pero ya resuelve el problema que más duele: si una instancia muere, el grupo la reemplaza solo y el balanceador deja de mandarle tráfico mientras tanto.
+
+Asumimos que ya tenés la VPC con dos subredes públicas y dos privadas en dos AZ ([módulo VPC](/servicios/vpc)) y una instancia configurada a partir de la cual lanzar las demás ([módulo EC2](/servicios/ec2)).
+
+## Las piezas, en orden
+
+```
+1. Launch Template  → la receta: AMI, tipo de instancia, Security Group,
+                      rol de IAM, User Data que instala el servidor web
+2. Target Group     → tipo Instance, HTTP:80, health check contra /
+3. ALB              → en las dos subredes públicas; listener HTTP:80
+                      que reenvía al Target Group
+4. Auto Scaling     → sobre las dos subredes privadas;
+   Group              mínimo 2, deseada 2, máximo 2;
+                      asociado al Target Group
+```
+
+Con **mínimo = deseada = máximo = 2**, el grupo no tiene margen para crecer ni para achicarse. Su único trabajo es mantener dos instancias vivas. Y lo hace sin que nadie se lo pida: el número real de instancias siempre se persigue hasta igualar el **deseado**.
+
+## Qué hace cada pieza en el caso mínimo
+
+| Pieza | Responsabilidad | Qué pasa si falta |
+| --- | --- | --- |
+| **Launch Template** | Define cómo nace cada instancia | El ASG no sabe qué lanzar |
+| **Target Group** | Lista los destinos y decide cuáles están sanos | El balanceador no tiene a quién mandar tráfico |
+| **ALB** | Punto de entrada único y estable para el usuario | Cada instancia tiene su propia IP y el usuario no sabe cuál usar |
+| **ASG** | Mantiene dos instancias, una por AZ, y reemplaza las que caen | Si una instancia muere, queda muerta |
+
+El ASG reparte las instancias de forma equilibrada entre las AZ de sus subredes. Con dos subredes en dos AZ y deseada = 2, queda una instancia por AZ: si una AZ entera falla, la otra sigue sirviendo y el grupo lanza el reemplazo en la AZ que queda. Es la razón práctica por la que en el módulo VPC creaste dos subredes privadas en dos AZ.
+
+## Cómo sabe el balanceador a quién mandar tráfico
+
+El Target Group consulta periódicamente una ruta de cada instancia. Si responde con el código esperado las veces necesarias seguidas, la marca `healthy` y le envía tráfico. Si falla las veces necesarias seguidas, la marca `unhealthy` y deja de enviarle.
+
+| Estado del destino | Qué significa |
+| --- | --- |
+| `initial` | Registrándose, todavía sin evaluar |
+| `healthy` | Recibe tráfico |
+| `unhealthy` | Falló los health checks: no recibe tráfico |
+| `draining` | Se está retirando: termina las conexiones abiertas y no acepta nuevas |
+
+## La prueba que vale la pena hacer
+
+Terminá a mano una de las dos instancias desde la consola. Vas a ver dos cosas, en este orden:
+
+1. El Target Group la marca como no disponible y el ALB manda todo el tráfico a la otra. Para el usuario, el sitio sigue funcionando.
+2. El ASG detecta que tiene una instancia menos que la deseada y lanza una nueva desde el Launch Template. Cuando pasa los health checks, vuelve a recibir tráfico.
+
+Eso es el caso mínimo funcionando: todavía no hay elasticidad frente a la carga, pero ya hay **autorreparación**. El siguiente nivel le agrega lo que falta — que el número deseado cambie solo según la demanda.
