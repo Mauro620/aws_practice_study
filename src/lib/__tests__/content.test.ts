@@ -31,10 +31,11 @@ describe('getServicio', () => {
   })
 })
 
-describe('módulos de elasticidad y entrega de contenido', () => {
+describe('módulos de almacenamiento, elasticidad y entrega de contenido', () => {
   it.each([
-    ['elasticidad', 6, ['vpc', 'ec2']],
-    ['cloudfront', 7, ['vpc', 'ec2', 'iam']],
+    ['s3', 6, ['ec2', 'iam']],
+    ['elasticidad', 7, ['vpc', 'ec2']],
+    ['cloudfront', 8, ['vpc', 'ec2', 'iam', 's3']],
   ])('%s carga los cuatro niveles, su número de módulo y sus prerrequisitos', (id, modulo, prerequisitos) => {
     const servicio = getServicio(id)
 
@@ -51,7 +52,7 @@ describe('módulos de elasticidad y entrega de contenido', () => {
 })
 
 describe('mapa de dependencias entre módulos', () => {
-  it('ordena la secuencia pedagógica Bienvenida → Well-Architected → VPC → EC2 → IAM → Elasticidad → Entrega de contenido', () => {
+  it('ordena la secuencia pedagógica Bienvenida → Well-Architected → VPC → EC2 → IAM → S3 → Elasticidad → Entrega de contenido', () => {
     const modulo = (id: string) => getServicio(id).modulo
     expect([
       modulo('bienvenida'),
@@ -59,9 +60,10 @@ describe('mapa de dependencias entre módulos', () => {
       modulo('vpc'),
       modulo('ec2'),
       modulo('iam'),
+      modulo('s3'),
       modulo('elasticidad'),
       modulo('cloudfront'),
-    ]).toEqual([1, 2, 3, 4, 5, 6, 7])
+    ]).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
   })
 
   it('todo prerrequisito apunta a un módulo existente', () => {

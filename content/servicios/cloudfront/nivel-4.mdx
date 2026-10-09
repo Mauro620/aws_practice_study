@@ -74,13 +74,7 @@ Las dos "acercan" los datos, y por eso se confunden en el examen:
 
 ## Lo que el versionado protege y lo que no
 
-| Mecanismo | Protege contra | **No** protege contra |
-| --- | --- | --- |
-| Durabilidad de once nueves de S3 | Pérdida técnica: falla de hardware o de una AZ | Borrado o sobrescritura por error |
-| **Versionado** | Sobrescritura y borrado accidentales (delete marker) | Pérdida de la región completa; alguien que borra deliberadamente **versiones** específicas |
-| **CRR** | Pérdida de una región | Borrados, según cómo esté configurada la replicación *(qué borrados se replican: por verificar)* |
-
-Borrar un objeto versionado sin indicar versión solo agrega un delete marker. Pero **borrar una versión concreta sí la elimina de forma permanente**, y el versionado no evita eso: quien tenga permiso para borrar versiones puede borrar el historial. Para blindarlo existen controles adicionales (como MFA Delete u Object Lock) *(detalle de alcance: por verificar)*.
+El versionado protege contra la sobrescritura y el borrado accidentales (un borrado sin versión solo agrega un *delete marker*). **No** protege contra la pérdida de la región, y **borrar una versión concreta sí la elimina de forma permanente**: quien tenga ese permiso puede borrar el historial. La tabla completa de qué protege cada mecanismo, y los controles adicionales como Object Lock, están en el [módulo de S3](/servicios/s3).
 
 ## Dos correcciones que vale la pena fijar
 
@@ -89,10 +83,11 @@ Borrar un objeto versionado sin indicar versión solo agrega un delete marker. P
 
 ## Nombres de bucket: globales e inmutables
 
-El nombre de un bucket es **único en todo AWS**, no solo en tu cuenta, y **no se puede cambiar**: "renombrar" es crear otro bucket y copiar todo. Entre 3 y 63 caracteres, minúsculas, números, guiones y puntos. Evitá los puntos en buckets que se sirven por HTTPS: generan conflictos con el certificado del endpoint de S3.
+El nombre de un bucket es único en todo AWS y no se puede cambiar. Evitá los puntos en buckets que se sirven por HTTPS: generan conflictos con el certificado del endpoint de S3. Las reglas completas están en el [módulo de S3](/servicios/s3).
 
 ## Cómo conecta con el resto del curso
 
 - **Con VPC y EC2:** el ALB público y las instancias en subredes privadas son el origen dinámico de la distribución.
 - **Con IAM:** la política de bucket que habilita OAC es una política basada en recursos, con `Principal` y una condición atada a una distribución concreta.
+- **Con S3:** el módulo anterior desarrolla el bucket que hace de origen: clases, ciclo de vida, versionado, cifrado y permisos.
 - **Con Elasticidad:** cada petición que se resuelve en el borde es una petición que el ASG no tiene que absorber. Una capa absorbe, la otra crece.

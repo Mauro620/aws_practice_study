@@ -72,19 +72,9 @@ Para publicar una versión nueva del CSS, **no se invalida: se versiona el nombr
 
 El ALB detrás de `/api/*` también gana con esto: las peticiones estáticas nunca le llegan, así que necesita escalar mucho menos.
 
-## 5. El bucket con versionado y ciclo de vida
+## 5. El bucket con versionado, ciclo de vida y clase adecuada
 
-**Versionado:** cada escritura crea una versión nueva en lugar de sobrescribir. Al borrar un objeto, S3 no lo elimina: coloca un **delete marker** que lo oculta, y quitando el marcador el objeto vuelve.
-
-| Estado | Comportamiento |
-| --- | --- |
-| Deshabilitado | Estado inicial |
-| Habilitado | Cada escritura crea una versión nueva |
-| Suspendido | Deja de versionar pero **conserva** las versiones anteriores |
-
-**Una vez habilitado, no se puede volver a deshabilitar: solo suspender.**
-
-Cada versión ocupa espacio y **se factura por separado**: un archivo de 1 GB modificado diez veces son 10 GB. Por eso el versionado se combina siempre con **reglas de ciclo de vida**, que pueden tratar distinto a la versión actual y a las anteriores:
+El bucket que hace de origen conviene versionado, con reglas de ciclo de vida que tratan distinto a la versión actual y a las anteriores, y con la clase de almacenamiento según el patrón de acceso. El detalle de cada mecanismo está en el [módulo de S3](/servicios/s3); para la cafetería queda así:
 
 ```
 Versión actual       → S3 Standard (es el origen de CloudFront)
@@ -94,21 +84,9 @@ Prefijo backups/     → Standard → Glacier Flexible Retrieval a los 90 días
                      → eliminados a los 365 días
 ```
 
-## 6. Elegir la clase de almacenamiento
+Dos recordatorios: el versionado, una vez habilitado, solo se puede suspender, y cada versión se factura por separado, así que sin reglas de ciclo de vida la factura crece sin control.
 
-La regla general: **cuanto más barato guardar, más caro o lento recuperar**. La durabilidad de once nueves es la misma en todas las clases; lo que cambia es la disponibilidad, el costo de acceso y la latencia — salvo One Zone-IA, que vive en una sola AZ y queda expuesta a la pérdida de esa zona.
-
-| Clase | Patrón de acceso | Recuperación | En la cafetería |
-| --- | --- | --- | --- |
-| **S3 Standard** | Frecuente | Inmediata | Imágenes y CSS del sitio: origen de CloudFront |
-| **Intelligent-Tiering** | Desconocido o variable | Inmediata | Fotos subidas por clientes, sin patrón claro |
-| **Standard-IA** | Poco frecuente | Inmediata | Versiones anteriores, backups recientes |
-| **One Zone-IA** | Poco frecuente, dato reproducible | Inmediata | Miniaturas que se pueden regenerar |
-| **Glacier Instant Retrieval** | Raro, pero debe llegar ya | Milisegundos | Facturas de años anteriores que se consultan poco |
-| **Glacier Flexible Retrieval** | Muy raro | Minutos a horas | Archivado |
-| **Glacier Deep Archive** | Casi nunca | Horas *(hasta 12 h en la recuperación estándar, por verificar)* | Retención legal de largo plazo |
-
-## 7. La seguridad que ya viene incluida
+## 6. La seguridad que ya viene incluida
 
 - **AWS Shield Standard** está activo sin costo en CloudFront y Route 53, contra DDoS de capas 3 y 4.
 - **AWS WAF** se puede agregar a la distribución para filtrar por reglas de capa 7 (inyección SQL, límites de tasa, reputación de IP).

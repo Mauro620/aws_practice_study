@@ -7,13 +7,13 @@ import {
 } from '../exam-bank'
 
 describe('BANCO_PREGUNTAS', () => {
-  it('tiene 19 preguntas: las 7 del banco del curso más 12 de elasticidad y entrega de contenido', () => {
-    expect(BANCO_PREGUNTAS).toHaveLength(19)
+  it('tiene 25 preguntas: las 7 del banco del curso, 12 de elasticidad y entrega de contenido y 6 de almacenamiento S3', () => {
+    expect(BANCO_PREGUNTAS).toHaveLength(25)
   })
 
-  it('las preguntas nuevas siguen la secuencia P8–P19 y cada una cierra con una regla', () => {
+  it('las preguntas nuevas siguen la secuencia P8–P25 y cada una cierra con una regla', () => {
     const nuevas = BANCO_PREGUNTAS.slice(7)
-    expect(nuevas.map((p) => p.id)).toEqual(Array.from({ length: 12 }, (_, i) => `P${i + 8}`))
+    expect(nuevas.map((p) => p.id)).toEqual(Array.from({ length: 18 }, (_, i) => `P${i + 8}`))
     for (const p of nuevas) {
       expect(p.regla?.length ?? 0).toBeGreaterThan(0)
       for (const o of p.opciones) {
@@ -22,10 +22,11 @@ describe('BANCO_PREGUNTAS', () => {
     }
   })
 
-  it('cubre elasticidad y entrega de contenido con seis preguntas cada uno', () => {
+  it('cubre elasticidad, entrega de contenido y almacenamiento S3 con seis preguntas cada uno', () => {
     const porTema = (prefijo: string) => BANCO_PREGUNTAS.filter((p) => p.tema.startsWith(prefijo)).length
     expect(porTema('Elasticidad')).toBe(6)
     expect(porTema('Entrega de contenido')).toBe(6)
+    expect(porTema('Almacenamiento S3')).toBe(6)
   })
 
   it('cada pregunta tiene opciones, correctas y justificaciones coherentes', () => {

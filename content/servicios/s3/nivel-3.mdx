@@ -1,0 +1,151 @@
+---
+titulo: Casos de uso, clases de almacenamiento, ciclo de vida, versionado y cifrado
+---
+
+El caso mínimo guardaba un archivo. El caso realista es la cafetería con una carga **diaria** de cifras de ventas, un sitio estático, respaldos y datos para análisis: la misma capa de almacenamiento, con decisiones de costo y de seguridad en cada paso.
+
+```
+ Vendedores / EC2 ──[rol de IAM]──► Bucket "ventas"
+                                      versionado activo · SSE-KMS
+                                      Block Public Access · sin ACL
+                                      ciclo de vida: Standard → IA → Glacier
+                                          │
+                       ┌──────────────────┼──────────────────┐
+                  Análisis (Athena)   Réplica (CRR)     Inventario
+                                      a otra región     semanal
+```
+
+## 1. Casos de uso
+
+| Caso | Qué resuelve |
+| --- | --- |
+| **Picos en la demanda** | Aloja contenido web que necesita ancho de banda para picos extremos |
+| **Sitio estático** | Aloja un sitio compuesto por HTML, imágenes y videos |
+| **Análisis** | Almacena datos que otros servicios consumen para procesarlos |
+| **Recuperación de desastres** | Respalda datos y soporta soluciones de recuperación |
+
+**Multimedia.** S3 almacena y distribuye videos, fotos y música de dos maneras: directo desde S3 (cada objeto tiene una URL HTTP única) o como origen de una CDN como [CloudFront](/servicios/cloudfront), que lo cachea cerca del usuario. Su elasticidad lo hace ideal para sitios de rápido crecimiento con contenido generado por usuarios: no hay que aprovisionar almacenamiento por adelantado.
+
+**Análisis.** El patrón típico de integración y preparación de datos:
+
+```
+1. Se inicia capacidad de cómputo (flota de spot de EC2, o clúster de EMR)
+2. Se extraen los datos sin procesar desde S3 y desde otro origen
+3. Los algoritmos integran y transforman los datos
+4. Los datos procesados se cargan en un bucket DISTINTO
+5. Se TERMINA la capacidad de cómputo para ahorrar costos
+6. Una herramienta de análisis (QuickSight, Athena) extrae información
+```
+
+El paso 5 es el que conviene retener: el cómputo es efímero y se paga por el tiempo usado, mientras que los datos persisten en S3. Esa separación entre almacenamiento y cómputo es lo que abarata la arquitectura.
+
+**Respaldo y archivado.** Por su durabilidad y escalabilidad, S3 funciona como destino de respaldo, tanto desde un centro de datos local como desde instancias EC2. Dos opciones amplían la protección: la **replicación entre regiones** (asincrónica) y la transición a **S3 Glacier** para retención a largo plazo.
+
+## 2. Sitio estático: el alojamiento nativo y su límite
+
+Un sitio estático entrega páginas con contenido fijo, que pueden incluir scripts del lado del cliente. Uno dinámico depende de procesamiento del lado del servidor (PHP, JSP, ASP.NET).
+
+> **S3 no admite scripting del lado del servidor.** Para sitios dinámicos hay que usar otros servicios de AWS, como los del [módulo EC2](/servicios/ec2).
+
+La configuración nativa tiene cuatro pasos: habilitar el alojamiento de sitios web estáticos, indicar el documento de índice (`index.html`) y opcionalmente el de error, adjuntar una política de bucket que permita el acceso, y cargar el contenido. La URL resultante tiene la forma `bucket.s3-website.region.amazonaws.com`. No hay ninguna máquina virtual ni servidor web que mantener.
+
+**El matiz que importa para el diseño actual:** este alojamiento exige un **bucket público** y solo sirve por **HTTP**. En una arquitectura moderna se prefiere el bucket privado con CloudFront delante y OAC: suma HTTPS, dominio propio y caché. Ese diseño es el centro del [módulo de Entrega de contenido](/servicios/cloudfront).
+
+## 3. Mover datos hacia S3
+
+- Cargar un objeto requiere **permiso de escritura** sobre el bucket.
+- Se puede cargar cualquier tipo de archivo, sin límite en la cantidad de objetos.
+- Los objetos se **cifran de forma predeterminada** al cargarse (SSE-S3) y se descifran al descargarlos.
+
+### Carga multiparte
+
+Divide un archivo grande en partes que se suben **en paralelo** y se reensamblan en destino.
+
+| Aspecto | Detalle |
+| --- | --- |
+| Recomendada desde | Archivos de más de 100 MB |
+| Obligatoria desde | Archivos de más de 5 GB |
+| Ventajas | Más rendimiento, reanudación tras un fallo sin reiniciar todo, subida mientras el archivo aún se genera |
+| Cuidado | Una carga interrumpida deja partes almacenadas que **siguen facturando** |
+
+### Transfer Acceleration
+
+Acelera las transferencias a larga distancia enrutando los datos por la red troncal de AWS, a través de la edge location de CloudFront más cercana, en lugar de ir por la Internet pública hasta la región del bucket. Tiene costo adicional y solo conviene si la distancia entre cliente y bucket es grande. AWS ofrece una herramienta de comparación de velocidad para decidir si vale la pena.
+
+### Desde una subred privada
+
+Las instancias de las subredes privadas del [módulo VPC](/servicios/vpc) pueden llegar a S3 sin salir a Internet y sin pasar por el NAT Gateway mediante un **VPC Endpoint de tipo Gateway**. Es gratuito y reduce costo.
+
+## 4. Elegir la clase de almacenamiento
+
+La regla general: **cuanto más barato guardar, más caro o lento recuperar.**
+
+| Clase | Patrón de acceso | Recuperación | AZ | Uso típico |
+| --- | --- | --- | --- | --- |
+| **S3 Standard** | Frecuente | Inmediata | Varias | Contenido activo, origen de CloudFront |
+| **Intelligent-Tiering** | Variable o desconocido | Inmediata | Varias | Cuando no se conoce el patrón: mueve los objetos solo |
+| **Standard-IA** | Poco frecuente | Inmediata | Varias | Respaldos recientes, datos ocasionales |
+| **One Zone-IA** | Poco frecuente | Inmediata | **Una sola** | Más barato, menos resistente. Solo datos reproducibles |
+| **Glacier Instant Retrieval** | Raro | Milisegundos | Varias | Casi nunca se piden, pero deben llegar ya |
+| **Glacier Flexible Retrieval** | Muy raro | Minutos a horas | Varias | Archivado |
+| **Glacier Deep Archive** | Casi nunca | Horas *(hasta 12 h en la recuperación estándar, por verificar)* | Varias | Retención legal a largo plazo. La más barata |
+
+Intelligent-Tiering monitorea el uso real de cada objeto y lo mueve al nivel más rentable, a cambio de una pequeña tarifa de monitoreo. Es la opción por defecto cuando el patrón se desconoce o cambia.
+
+## 5. Reglas de ciclo de vida
+
+Automatizan el movimiento entre clases y la eliminación de objetos:
+
+```
+Día 0    → S3 Standard
+Día 30   → S3 Standard-IA
+Día 90   → S3 Glacier Flexible Retrieval
+Día 365  → Eliminar
+```
+
+Se pueden aplicar a todo el bucket o a un **prefijo** (`logs/`, `assets/`), filtrar por **etiqueta** o tamaño, y tratar distinto a la versión actual y a las anteriores. Las dos acciones son **transición** (mover a otra clase) y **caducidad** (eliminar el objeto, una versión anterior o un marcador de eliminación).
+
+> La regla que casi siempre conviene añadir: **eliminar las cargas multiparte incompletas** después de 7 días. Es almacenamiento invisible que nadie revisa y que factura.
+
+## 6. Control de versiones
+
+Conserva **todas las versiones** de un objeto en lugar de sobrescribirlas.
+
+| Estado | Comportamiento |
+| --- | --- |
+| **Deshabilitado** | Estado inicial del bucket |
+| **Habilitado** | Cada escritura crea una versión nueva |
+| **Suspendido** | Deja de versionar, pero **conserva las versiones anteriores** |
+
+**Una vez habilitado, no se puede deshabilitar: solo suspender.**
+
+Protege contra tres cosas: la **sobrescritura accidental** (la versión anterior sigue ahí), el **borrado accidental** (S3 coloca un *delete marker* que oculta el objeto; quitándolo, vuelve) y la corrupción o el ransomware (permite volver a un estado conocido).
+
+**El costo que sorprende:** cada versión ocupa espacio y se factura por separado. Un archivo de 1 GB modificado diez veces son 10 GB facturados. Por eso el versionado se combina siempre con reglas de ciclo de vida que muevan las versiones anteriores a una clase barata y las eliminen pasado un tiempo.
+
+## 7. Cifrado
+
+### En reposo
+
+| Opción | Quién cifra | Quién administra la clave | Cuándo usarla |
+| --- | --- | --- | --- |
+| **SSE-S3** | S3 | AWS, transparente | Predeterminada. Cubre la mayoría de casos |
+| **SSE-KMS** | S3 | Vos, mediante AWS KMS | Control, rotación auditable y registro de uso de la clave en CloudTrail |
+| **SSE-C** | S3 | Vos, enviando la clave en cada petición | Poco común: custodiás la clave por completo |
+| **CSE** (lado del cliente) | El cliente, antes de enviar | Vos | AWS no debe ver los datos en claro en ningún momento |
+
+Desde 2023, todos los objetos nuevos se cifran con SSE-S3 por defecto, sin configuración. Con cifrado del lado del servidor, AWS ve los datos en claro en algún momento del proceso; con el del lado del cliente, no. La elección depende del modelo de amenaza y de los requisitos de cumplimiento.
+
+### En tránsito
+
+Se protege con **TLS**. Para exigirlo, se agrega a la política del bucket una condición que **deniegue las peticiones que no usen conexión segura**.
+
+## 8. Inventario y observabilidad
+
+| Herramienta | Para qué sirve |
+| --- | --- |
+| **Inventario de S3** | Informe periódico (diario o semanal) con la lista de objetos y sus metadatos: tamaño, clase, cifrado, versionado. Sirve para auditar y decidir optimizaciones |
+| **Storage Lens** | Panel de métricas de uso y actividad de todos los buckets, con recomendaciones |
+| **Métricas de CloudWatch** | Tamaño del bucket, número de objetos, peticiones y errores |
+| **Registros de acceso al servidor** | Registro detallado de cada petición al bucket |
+| **CloudTrail** | Registro de las llamadas a la API: quién hizo qué |

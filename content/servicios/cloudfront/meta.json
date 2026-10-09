@@ -2,8 +2,8 @@
   "id": "cloudfront",
   "nombre": "Entrega de contenido (CloudFront, HTTPS y S3)",
   "categoria": "Red",
-  "modulo": 7,
-  "prerequisitos": ["vpc", "ec2", "iam"],
+  "modulo": 8,
+  "prerequisitos": ["vpc", "ec2", "iam", "s3"],
   "resumenUnaLinea": "S3 guarda el contenido, CloudFront lo acerca al usuario desde el borde, TLS con ACM garantiza que viaje cifrado y autenticado, y Route 53 le pone un nombre propio.",
   "erroresFrecuentes": [
     { "descripcion": "Hacer el bucket público para que CloudFront lo lea: cualquiera se salta la CDN y accede directo. Bucket privado + OAC." },

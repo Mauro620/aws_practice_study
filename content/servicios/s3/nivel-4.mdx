@@ -1,0 +1,127 @@
+---
+titulo: Permisos, qué protege cada mecanismo, Well-Architected y la pregunta de examen
+---
+
+El caso realista funciona. Estos son los bordes donde se expone un bucket, se pierde un dato o se dispara la factura, y los puntos donde más se pierden respuestas en el examen.
+
+## Cuatro mecanismos de permisos
+
+Saber cuál usar evita la configuración peligrosa más común en AWS.
+
+| Mecanismo | Alcance | Estado actual |
+| --- | --- | --- |
+| **Bloqueo de acceso público** | Cuenta y bucket | **Interruptor maestro.** Activado por defecto |
+| **Política de bucket** | Todo el bucket o rutas dentro de él | **El método recomendado** |
+| **Política de IAM** | Una identidad, sobre varios buckets | Permisos de usuarios y roles |
+| **ACL** | Bucket u objeto individual | **Heredado.** Desaconsejado por AWS |
+
+### El Bloqueo de acceso público prevalece sobre todo
+
+Aunque una política o una ACL concedan acceso público, si el bloqueo está activo **el acceso se deniega**. Existe porque los buckets públicos mal configurados fueron durante años una de las causas más frecuentes de filtración de datos. Desde 2023 viene activado por defecto en buckets nuevos.
+
+### Política de bucket vs. política de IAM
+
+Es la distinción del [módulo IAM](/servicios/iam) aplicada a S3:
+
+| | Política de IAM (identidad) | Política de bucket (recurso) |
+| --- | --- | --- |
+| Se adjunta a | Usuario, grupo o rol | El bucket |
+| Responde | Qué puede hacer **esta identidad** | Quién puede hacer qué **sobre este bucket** |
+| Elemento `Principal` | No se incluye | **Obligatorio** |
+| Uso típico | Permisos de empleados y aplicaciones | Acceso entre cuentas, acceso desde CloudFront |
+
+Dentro de una misma cuenta, un `Allow` en **cualquiera** de las dos basta para permitir la acción, y un `Deny` en cualquiera la bloquea. Para el acceso entre cuentas siguen haciendo falta las dos mitades, como se vio en IAM.
+
+### ACL: por qué ya no se usan
+
+Las **ACL** son el mecanismo original de S3, anterior a IAM. Conceden permisos amplios y predefinidos:
+
+| ACL predefinida | Efecto |
+| --- | --- |
+| `private` | Solo el propietario. Es la predeterminada |
+| `public-read` | Cualquiera puede leer los objetos |
+| `public-read-write` | Cualquiera puede leer **y escribir**. Nunca usar |
+| `authenticated-read` | Cualquier usuario autenticado de AWS, no solo de tu cuenta |
+| `bucket-owner-full-control` | El dueño del bucket controla los objetos que suban otros |
+
+AWS las desaconseja porque no admiten condiciones, no se auditan con las mismas herramientas que IAM y su granularidad es tosca. Todo lo que hacen se expresa mejor con una política de bucket. La configuración recomendada es **Object Ownership: Bucket owner enforced**, que **deshabilita las ACL por completo**.
+
+### Permisos de bucket y de objeto
+
+Un objeto puede tener permisos distintos a los de su bucket. Por eso **un bucket privado puede contener objetos públicos** si alguien les puso una ACL individual. Es justo la inconsistencia que eliminan el Bloqueo de acceso público y Bucket owner enforced.
+
+## Lo que significan las cifras de durabilidad
+
+| Métrica | Valor | Qué garantiza |
+| --- | --- | --- |
+| **Durabilidad** | 11 nueves (99,999999999 %) | La probabilidad de **perder** un objeto es ínfima |
+| **Disponibilidad** | 4 nueves (99,99 %) en Standard | La probabilidad de **no poder acceder** temporalmente |
+
+S3 almacena los objetos de forma redundante en varias AZ de la región y verifica regularmente su integridad con sumas de verificación. La durabilidad es de once nueves en **todas** las clases; lo que cambia es la disponibilidad y el costo de acceso, salvo **One Zone-IA**, que al vivir en una sola AZ sí es vulnerable a la pérdida de esa zona.
+
+### Qué protege cada mecanismo
+
+| Mecanismo | Protege contra | **No** protege contra |
+| --- | --- | --- |
+| Replicación automática dentro de la región | Fallo de hardware o de una AZ | Borrado accidental, corrupción lógica |
+| **Control de versiones** | Sobrescritura y borrado accidental | Pérdida de la región; quien borra **versiones** concretas |
+| **Replicación entre regiones (CRR)** | Pérdida de una región, residencia de datos | Un borrado que se replique |
+| **AWS Backup** | Gestión centralizada con políticas de retención | — |
+
+> **La idea clave:** la durabilidad de once nueves protege contra la **pérdida técnica** del dato, no contra que alguien lo borre o lo sobrescriba. Para eso están el versionado y las copias.
+
+### Object Lock
+
+Para requisitos normativos estrictos existe **Object Lock**: impide eliminar o sobrescribir un objeto durante un periodo definido, bajo un modelo WORM (escribir una vez, leer muchas). Requiere versionado activo. Históricamente solo podía habilitarse al crear el bucket *(si hoy puede activarse en un bucket existente: por verificar en la documentación vigente)*.
+
+## Los costos que no se ven
+
+- **Carga multiparte interrumpida:** las partes siguen almacenadas y facturando. Regla de ciclo de vida que las elimine a los 7 días.
+- **Versiones anteriores:** cada una se factura. Regla de ciclo de vida sobre las no actuales.
+- **Duración mínima facturable:** las clases de acceso poco frecuente y Glacier cobran un mínimo de almacenamiento *(30 días en Standard-IA y One Zone-IA, 90 en Glacier Instant y Flexible, 180 en Deep Archive; por verificar en la página de precios)*. Mover un objeto a Glacier y sacarlo a los dos días puede salir más caro que dejarlo en Standard.
+- **Recuperación:** las clases de acceso poco frecuente cobran por GB recuperado.
+
+## Lo que S3 no es
+
+Los objetos son inmutables, así que **S3 no sirve como sistema de archivos de una aplicación** ni como disco de una base de datos: cada cambio reescribe el archivo entero. Para eso están EBS y EFS. Tampoco ejecuta código del lado del servidor.
+
+## El Marco Well-Architected aplicado a S3
+
+| Pilar | Práctica recomendada | Cómo la respalda S3 |
+| --- | --- | --- |
+| **Seguridad** | Aplicar cifrado en reposo e implementar control de acceso | Cifrado por defecto con opciones de claves; buckets y objetos privados por defecto; políticas de IAM y de bucket; versionado; Bloqueo de acceso público |
+| **Eficiencia del rendimiento** | Conocer los servicios disponibles y considerar el costo al decidir | Ideal para grandes cantidades de datos no estructurados; Transfer Acceleration; carga multiparte; clases según el patrón de acceso; Intelligent-Tiering |
+| **Optimización de costos** | Analizar el costo de cada componente a lo largo del tiempo | Reglas de ciclo de vida; Intelligent-Tiering; Inventario de S3 para auditar el uso |
+| **Fiabilidad** | Seleccionar ubicaciones adecuadas para una implementación en múltiples zonas | 11 nueves de durabilidad y 4 de disponibilidad; redundancia en varias AZ; sumas de verificación |
+
+> *Los errores son un hecho y, con el tiempo, todo fallará.* — Werner Vogels, CTO de Amazon.
+
+En fiabilidad, S3 ya incorpora estas prácticas **por diseño**: el arquitecto no tiene que construirlas.
+
+## La pregunta de examen resuelta
+
+**Escenario:** los vendedores cargan sus cifras de ventas a diario en S3, pero al arquitecto le preocupa que los usuarios puedan borrar o sobrescribir accidentalmente documentos importantes. ¿Qué acción protege contra las acciones involuntarias?
+
+| Opción | Veredicto |
+| --- | --- |
+| Almacenar los datos en dos buckets de regiones distintas | ❌ Protege contra una interrupción regional, pero no impide que alguien borre o sobrescriba un archivo |
+| **Habilitar el control de versiones en el bucket** | ✅ Correcta: la versión anterior del archivo permanece disponible |
+| Mover los datos a una clase de acceso poco frecuente cada fin de semana | ❌ Resuelve un problema de costos, no de protección ante borrado |
+| Usar el Inventario de S3 para auditar los objetos | ❌ Ayuda a entender la actividad del bucket, pero no evita que se eliminen archivos |
+
+**La regla generalizable:** *borrado o sobrescritura accidental* → **versionado**. *Pérdida de una región o residencia de datos* → **replicación entre regiones**. *Costos de datos poco consultados* → **clase de almacenamiento o ciclo de vida**. *Auditoría* → **Inventario de S3**.
+
+## Cinco escenarios para practicar
+
+- **Registros contables que se conservan siete años, casi nunca se consultan y pueden esperar medio día.** → Glacier Deep Archive. Instant Retrieval sería innecesariamente caro para datos que nadie consulta con urgencia.
+- **Un conjunto de datos nuevo cuyo patrón de acceso se desconoce y puede cambiar.** → Intelligent-Tiering: mueve los objetos según el uso real, sin analizar patrones ni crear reglas.
+- **Un sitio estático por HTTPS con dominio propio.** → Bucket privado + CloudFront con OAC + certificado de ACM en `us-east-1`. El alojamiento nativo exige bucket público y solo sirve por HTTP.
+- **Un consultor externo que necesita descargar un archivo grande durante un día.** → Presigned URL con expiración de 24 horas. Un usuario de IAM funcionaría, pero no caduca solo y hay que acordarse de eliminarlo.
+- **Un bucket con Bloqueo de acceso público activo y una política que concede `s3:GetObject` a todos.** → El acceso se deniega: el bloqueo prevalece sobre cualquier política o ACL.
+
+## Cómo conecta con el resto del curso
+
+- **Con VPC:** el VPC Endpoint de tipo Gateway lleva el tráfico a S3 sin Internet ni NAT Gateway, y es gratuito.
+- **Con EC2:** S3 es almacenamiento de objetos y EBS de bloques. S3 guarda lo que se consulta mucho y se edita poco; EBS es el disco de la instancia.
+- **Con IAM:** las políticas de bucket son políticas basadas en recursos. Una aplicación en EC2 accede a S3 mediante un **rol de IAM**, nunca con claves guardadas en la instancia.
+- **Con Entrega de contenido:** S3 como origen privado detrás de una CDN es el patrón recomendado para contenido estático público.
