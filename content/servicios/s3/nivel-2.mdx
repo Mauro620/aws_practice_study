@@ -1,0 +1,70 @@
+---
+titulo: Un bucket, un objeto y un enlace que caduca
+---
+
+El caso mínimo de S3 cabe en tres pasos: **crear un bucket, subir un archivo y compartirlo sin hacerlo público**. Es poco, pero ya muestra casi todo lo que distingue a S3 de un disco.
+
+## Los pasos
+
+```
+1. Creás el bucket, por ejemplo: cafeteria-ventas-2026
+   → Región elegida, Block Public Access ACTIVADO (viene así por defecto)
+   → Object Ownership: Bucket owner enforced (ACL deshabilitadas)
+2. Subís un archivo: ventas/2026/marzo/resumen.csv
+   → Se cifra solo, con SSE-S3
+3. Abrís el objeto: tiene una URL, pero responde "Access Denied"
+4. Generás una presigned URL con expiración de 1 hora
+   → Cualquiera con el enlace lo descarga durante esa hora
+```
+
+En ningún paso el bucket se vuelve público. El objeto sale al mundo por un enlace que se vence solo.
+
+## Qué es un bucket
+
+- Es el contenedor donde se guardan los objetos.
+- Su nombre debe ser **único a nivel mundial**: en todas las regiones y en todas las cuentas de clientes de AWS.
+- No hay límite en la cantidad total de datos ni en el número de objetos que contiene.
+- Cada objeto tiene una **URL única a nivel mundial**.
+
+### Las reglas del nombre
+
+Importan porque **no se pueden cambiar después**:
+
+- Entre 3 y 63 caracteres.
+- Solo minúsculas, números, guiones y puntos. Sin mayúsculas ni guiones bajos.
+- Sin formato de dirección IP.
+- Si no te gusta el nombre, la única salida es crear otro bucket y copiar todo.
+
+## Qué es un objeto
+
+Un objeto pesa entre **0 bytes y 5 TB** y se compone de cinco cosas:
+
+| Característica | Qué es |
+| --- | --- |
+| **Clave** | El nombre del objeto; es lo que se usa para recuperarlo. Incluye la ruta completa hasta la raíz del bucket |
+| **ID de versión** | Junto con la clave, identifica el objeto de forma única dentro del bucket |
+| **Valor** | El contenido real. Es **inmutable**: para cambiarlo, lo modificás afuera y lo volvés a cargar |
+| **Metadatos** | Pares nombre-valor con información sobre el objeto, definidos por el usuario o asignados por el sistema |
+| **Subrecursos** | Información adicional específica del objeto |
+
+## Las carpetas no existen
+
+La consola te deja "crear una carpeta", pero **S3 no conoce directorios**. La clave simplemente contiene la ruta como texto:
+
+```
+ventas/2026/marzo/resumen.csv
+└───────── una sola clave, no tres carpetas ─────────┘
+```
+
+La parte inicial (`ventas/2026/`) se llama **prefijo** y sirve para filtrar y organizar. La consecuencia práctica: "mover una carpeta" implica copiar y borrar cada objeto uno por uno, porque no hay ningún directorio que mover.
+
+## Por qué la presigned URL y no un usuario
+
+Para dar acceso puntual a un objeto sin hacerlo público ni crear un usuario de IAM, se genera una **URL prefirmada** con fecha de expiración. El bucket sigue privado y el enlace caduca solo.
+
+> **Regla práctica:** acceso puntual y temporal a un objeto → presigned URL. Acceso recurrente o a varios recursos → rol de IAM.
+
+## Dos cosas que ya funcionan y no se ven
+
+- **Cifrado por defecto.** Todo objeto nuevo se cifra con SSE-S3 sin configurar nada, y se descifra solo al descargarlo.
+- **Privado por defecto.** Buckets y objetos nacen privados: el acceso se concede explícitamente. Es la misma filosofía del [módulo IAM](/servicios/iam), aplicada al almacenamiento.

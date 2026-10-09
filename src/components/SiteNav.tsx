@@ -17,8 +17,9 @@ export const COURSE_MODULES: { category: string; modules: CourseModule[] }[] = [
       { id: 'vpc', label: 'M3 Amazon VPC (Virtual Private Cloud)' },
       { id: 'ec2', label: 'M4 Amazon EC2 (Elastic Compute Cloud)' },
       { id: 'iam', label: 'M5 Protección del acceso (AWS IAM)' },
-      { id: 'elasticidad', label: 'M6 Elasticidad (Auto Scaling, Target Groups y CloudWatch)' },
-      { id: 'cloudfront', label: 'M7 Entrega de contenido (CloudFront, HTTPS y S3)' },
+      { id: 's3', label: 'M6 Capa de almacenamiento (Amazon S3)' },
+      { id: 'elasticidad', label: 'M7 Elasticidad (Auto Scaling, Target Groups y CloudWatch)' },
+      { id: 'cloudfront', label: 'M8 Entrega de contenido (CloudFront, HTTPS y S3)' },
     ],
   },
 ]

@@ -311,7 +311,7 @@ describe('Modo 4 · Costos', () => {
 describe('Modo 5 · Ruta de aprendizaje', () => {
   const componentesDe = (modulo: string) => COMPONENTES.filter(({ id }) => MODULO_DE_COMPONENTE[id] === modulo).map(({ id }) => id)
 
-  it('follows the course module order M3 to M7', () => {
+  it('follows the course module order of the architecture modules (M3 to M5, M7, M8)', () => {
     expect(MODULOS_RUTA.map(({ id }) => id)).toEqual(['vpc', 'ec2', 'iam', 'elasticidad', 'cloudfront'])
     expect(MODULOS_RUTA.map(({ href }) => href)).toEqual(['/servicios/vpc', '/servicios/ec2', '/servicios/iam', '/servicios/elasticidad', '/servicios/cloudfront'])
   })

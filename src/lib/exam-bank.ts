@@ -7,7 +7,9 @@
  * Elasticidad (Auto Scaling, Target Groups, CloudWatch) and Entrega de
  * contenido (CloudFront, HTTPS/ACM, S3) modules, written from the class
  * notes 05-auto-scaling-target-groups-cloudwatch.md and
- * 04-cloudfront-https-s3.md. Each question carries the rationale for
+ * 04-cloudfront-https-s3.md. P20–P25 cover the Capa de almacenamiento
+ * (Amazon S3) module: P20 is the official AWS Academy module question and
+ * P21–P25 are practice scenarios. Each question carries the rationale for
  * every distractor so we can show it as feedback.
  */
 
@@ -623,6 +625,162 @@ export const BANCO_PREGUNTAS: Pregunta[] = [
     },
     regla:
       'Versionado: protege contra sobrescritura y borrado accidentales. No protege contra la pérdida de la región (eso es CRR), no baja costos (los sube: combinarlo con ciclo de vida) y no detiene a quien puede borrar versiones. La durabilidad de once nueves protege contra pérdida técnica, no contra borrados.',
+  },
+  {
+    id: 'P20',
+    tema: 'Almacenamiento S3 — Protección contra borrado y sobrescritura accidental',
+    tipo: 'simple',
+    enunciado:
+      'Los vendedores de la empresa cargan sus cifras de ventas a diario en Amazon S3, pero al arquitecto de soluciones le preocupa que los usuarios puedan borrar o sobrescribir accidentalmente documentos importantes. ¿Qué acción puede brindar protección contra las acciones involuntarias de los usuarios?',
+    opciones: [
+      { id: 'P20-A', letra: 'A', texto: 'Almacenar los datos en dos buckets en regiones distintas.' },
+      { id: 'P20-B', letra: 'B', texto: 'Habilitar el control de versiones en el bucket.' },
+      { id: 'P20-C', letra: 'C', texto: 'Mover los datos a una clase de acceso poco frecuente al final de cada semana.' },
+      { id: 'P20-D', letra: 'D', texto: 'Usar el Inventario de Amazon S3 para auditar los objetos.' },
+    ],
+    correctas: ['P20-B'],
+    justificaciones: {
+      'P20-A':
+        'Protege contra una interrupción regional, pero no impide que alguien borre o sobrescriba un archivo: si se borra en un bucket, el otro lo refleja o queda con la misma versión defectuosa.',
+      'P20-B':
+        'Correcta — con el versionado activo, la versión anterior del archivo permanece disponible tras una sobrescritura, y un borrado sin versión solo coloca un delete marker que se puede quitar.',
+      'P20-C':
+        'Resuelve un problema de costos, no de protección: cambiar de clase no impide que un usuario borre o sobrescriba el objeto.',
+      'P20-D':
+        'Ayuda a entender qué hay en el bucket y a auditar, pero es un informe: no evita que se eliminen los archivos.',
+    },
+    regla:
+      'Borrado o sobrescritura accidental → versionado. Pérdida de una región o residencia de datos → replicación entre regiones. Costos de datos poco consultados → clase de almacenamiento o ciclo de vida. Auditoría → Inventario de S3.',
+  },
+  {
+    id: 'P21',
+    tema: 'Almacenamiento S3 — Clase para retención legal de largo plazo',
+    tipo: 'simple',
+    enunciado:
+      'Una empresa debe conservar registros contables durante siete años por obligación legal. Casi nunca se consultan, y cuando se piden puede esperarse hasta medio día. ¿Qué clase de almacenamiento conviene?',
+    opciones: [
+      { id: 'P21-A', letra: 'A', texto: 'S3 Standard-IA' },
+      { id: 'P21-B', letra: 'B', texto: 'S3 Glacier Instant Retrieval' },
+      { id: 'P21-C', letra: 'C', texto: 'S3 Glacier Deep Archive' },
+      { id: 'P21-D', letra: 'D', texto: 'S3 One Zone-IA' },
+    ],
+    correctas: ['P21-C'],
+    justificaciones: {
+      'P21-A':
+        'Recuperación inmediata y más barata que Standard, pero pensada para datos de acceso ocasional, no para años de retención casi sin consultas: se paga por un acceso rápido que nadie necesita.',
+      'P21-B':
+        'Tiene la recuperación en milisegundos, pero eso es justo lo que este escenario no necesita: sería innecesariamente caro para datos que nadie consulta con urgencia.',
+      'P21-C':
+        'Correcta — es la clase más barata y su tiempo de recuperación, de hasta unas 12 horas en la recuperación estándar, es aceptable porque el enunciado permite esperar medio día.',
+      'P21-D':
+        'Guarda los datos en una sola AZ: si esa zona se pierde, se pierden los registros. Solo sirve para datos reproducibles, y un registro contable no lo es.',
+    },
+    regla:
+      'Dos señales: cada cuánto se accede y cuánto se puede esperar. Raro y puede esperar horas → Glacier Deep Archive. Raro pero inmediato → Glacier Instant Retrieval.',
+  },
+  {
+    id: 'P22',
+    tema: 'Almacenamiento S3 — Patrón de acceso desconocido',
+    tipo: 'simple',
+    enunciado:
+      'Un equipo no sabe con qué frecuencia se accederá a un conjunto de datos nuevo y el patrón podría cambiar con el tiempo. No quiere analizar patrones ni mantener reglas. ¿Qué clase de almacenamiento conviene?',
+    opciones: [
+      { id: 'P22-A', letra: 'A', texto: 'S3 Standard' },
+      { id: 'P22-B', letra: 'B', texto: 'S3 Intelligent-Tiering' },
+      { id: 'P22-C', letra: 'C', texto: 'S3 Standard-IA' },
+      { id: 'P22-D', letra: 'D', texto: 'S3 Glacier Flexible Retrieval' },
+    ],
+    correctas: ['P22-B'],
+    justificaciones: {
+      'P22-A':
+        'Funciona, pero si los datos terminan casi sin consultarse se paga el precio de acceso frecuente indefinidamente, y alguien tiene que notarlo y mover los objetos.',
+      'P22-B':
+        'Correcta — monitorea el uso real de cada objeto y lo mueve automáticamente al nivel más rentable, a cambio de una pequeña tarifa de monitoreo. Es la opción por defecto cuando el patrón se desconoce o cambia.',
+      'P22-C':
+        'Cobra por recuperación: si el patrón resulta ser de acceso frecuente, la factura de recuperación supera el ahorro.',
+      'P22-D':
+        'Tiene recuperación de minutos a horas: si el equipo necesita los datos pronto, no llegan a tiempo, y además cobra por recuperar.',
+    },
+    regla:
+      'Patrón de acceso desconocido o cambiante → Intelligent-Tiering. No hace falta analizar nada ni crear reglas de ciclo de vida.',
+  },
+  {
+    id: 'P23',
+    tema: 'Almacenamiento S3 — Sitio estático por HTTPS con dominio propio',
+    tipo: 'simple',
+    enunciado:
+      'Una empresa quiere servir un sitio web estático desde S3 por HTTPS y con su propio dominio. ¿Cuál es el diseño correcto?',
+    opciones: [
+      { id: 'P23-A', letra: 'A', texto: 'Habilitar el alojamiento de sitios web estáticos del bucket y hacer el bucket público.' },
+      { id: 'P23-B', letra: 'B', texto: 'Bucket privado, CloudFront con Origin Access Control (OAC) y un certificado de ACM solicitado en us-east-1.' },
+      { id: 'P23-C', letra: 'C', texto: 'Bucket público con una ACL public-read en cada objeto y un certificado instalado en el bucket.' },
+      { id: 'P23-D', letra: 'D', texto: 'Una instancia EC2 con un servidor web que lea el contenido del bucket.' },
+    ],
+    correctas: ['P23-B'],
+    justificaciones: {
+      'P23-A':
+        'El alojamiento nativo de S3 exige un bucket público y solo sirve por HTTP: no cumple el requisito de HTTPS ni de dominio propio.',
+      'P23-B':
+        'Correcta — el bucket queda privado, CloudFront firma las peticiones con OAC, el certificado de ACM (en us-east-1, que es donde CloudFront lo toma) da HTTPS con dominio propio y el caché mejora el rendimiento.',
+      'P23-C':
+        'Las ACL están desaconsejadas, el bucket público se salta cualquier CDN y un bucket no admite instalar certificados propios.',
+      'P23-D':
+        'Funcionaría, pero obliga a pagar y mantener una instancia para servir contenido estático que S3 y CloudFront entregan sin servidores.',
+    },
+    regla:
+      'Sitio estático por HTTPS con dominio propio → bucket privado + CloudFront con OAC + ACM en us-east-1. El alojamiento nativo de S3 exige bucket público y solo sirve por HTTP.',
+  },
+  {
+    id: 'P24',
+    tema: 'Almacenamiento S3 — Acceso temporal a un objeto privado',
+    tipo: 'simple',
+    enunciado:
+      'Un consultor externo necesita descargar un archivo grande de un bucket privado durante un día. ¿Cómo darle acceso con el menor riesgo?',
+    opciones: [
+      { id: 'P24-A', letra: 'A', texto: 'Hacer público el bucket durante un día y volver a hacerlo privado.' },
+      { id: 'P24-B', letra: 'B', texto: 'Crear un usuario de IAM para el consultor con una política de lectura sobre el bucket.' },
+      { id: 'P24-C', letra: 'C', texto: 'Generar una URL prefirmada del objeto con expiración de 24 horas.' },
+      { id: 'P24-D', letra: 'D', texto: 'Compartirle las claves de acceso de un usuario existente.' },
+    ],
+    correctas: ['P24-C'],
+    justificaciones: {
+      'P24-A':
+        'Expone todos los objetos del bucket a cualquiera durante ese día, no solo el archivo del consultor, y depende de que alguien se acuerde de revertirlo.',
+      'P24-B':
+        'Funcionaría, pero el acceso no caduca solo: hay que acordarse de eliminar el usuario, y se crea una identidad permanente para una necesidad de un día.',
+      'P24-C':
+        'Correcta — da acceso puntual a un único objeto sin hacerlo público ni crear identidades, y el enlace caduca solo.',
+      'P24-D':
+        'Compartir credenciales es incorrecto por definición: se pierde la trazabilidad individual y el acceso dura hasta que alguien las rote.',
+    },
+    regla:
+      'Acceso puntual y temporal a un objeto → URL prefirmada. Acceso recurrente o a varios recursos → rol de IAM. Compartir credenciales nunca es la respuesta.',
+  },
+  {
+    id: 'P25',
+    tema: 'Almacenamiento S3 — Bloqueo de acceso público y políticas de bucket',
+    tipo: 'simple',
+    enunciado:
+      'Un bucket tiene activo el Bloqueo de acceso público, pero una política de bucket concede s3:GetObject a todos (Principal: "*"). ¿Qué ocurre cuando un usuario anónimo intenta leer un objeto?',
+    opciones: [
+      { id: 'P25-A', letra: 'A', texto: 'Se permite el acceso, porque la política de bucket es más específica que el bloqueo.' },
+      { id: 'P25-B', letra: 'B', texto: 'Se permite el acceso solo si el objeto también tiene una ACL public-read.' },
+      { id: 'P25-C', letra: 'C', texto: 'Se deniega el acceso: el Bloqueo de acceso público prevalece sobre cualquier política o ACL.' },
+      { id: 'P25-D', letra: 'D', texto: 'Se permite el acceso durante unos minutos, hasta que el bloqueo se propaga.' },
+    ],
+    correctas: ['P25-C'],
+    justificaciones: {
+      'P25-A':
+        'El bloqueo no es una política más que compite por especificidad: es un interruptor maestro que se evalúa por encima de políticas y ACL.',
+      'P25-B':
+        'Ni con una ACL pública se permite: el bloqueo también anula las ACL públicas. Es justo la protección contra un bucket privado con objetos públicos.',
+      'P25-C':
+        'Correcta — el Bloqueo de acceso público prevalece sobre cualquier otra configuración: aunque una política o una ACL concedan acceso público, el acceso se deniega.',
+      'P25-D':
+        'No hay ventana de tolerancia: es un control de configuración, no un proceso de propagación al cliente.',
+    },
+    regla:
+      'Bloqueo de acceso público activo → ninguna política ni ACL puede abrir el bucket al público. Es el interruptor maestro y viene activado por defecto.',
   },
 ]
 

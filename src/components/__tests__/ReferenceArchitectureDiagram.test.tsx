@@ -73,9 +73,9 @@ describe('ReferenceArchitectureDiagram', () => {
 
     await user.click(within(diagrama()).getByRole('button', { name: /^CloudFront, edge locations, no visto/ }))
     const panel = screen.getByRole('dialog', { name: 'CloudFront' })
-    expect(within(panel).getByRole('link', { name: /Estudiarlo en M7/ })).toHaveAttribute('href', '/servicios/cloudfront')
+    expect(within(panel).getByRole('link', { name: /Estudiarlo en M8/ })).toHaveAttribute('href', '/servicios/cloudfront')
     await user.click(within(panel).getByRole('button', { name: 'Dominado' }))
-    expect(within(panel).queryByRole('link', { name: /Estudiarlo en M7/ })).not.toBeInTheDocument()
+    expect(within(panel).queryByRole('link', { name: /Estudiarlo en M8/ })).not.toBeInTheDocument()
   })
 
   it('Variantes: locked to Completa in traffic mode; Mínima hides the CDN and private layer in the diagram and the stack', async () => {

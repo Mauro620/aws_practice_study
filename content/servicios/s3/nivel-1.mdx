@@ -1,0 +1,40 @@
+---
+titulo: El guardarropa gigante
+---
+
+Imaginá el guardarropa de un teatro enorme. Entregás tu abrigo, te dan un **ticket numerado** y te vas. Cuando volvés, mostrás el ticket y te devuelven *ese* abrigo. No te importa en qué rincón lo colgaron ni cuántos abrigos hay en el edificio: el guardarropa nunca dice "estamos llenos".
+
+Un detalle más: si querés arreglarle el forro, no se lo cosés al abrigo colgado. Lo retirás, lo arreglás en casa y **entregás el abrigo entero otra vez**. Y los tickets no tienen pasillos ni secciones: el ticket `fotos/2026/marzo/logo.png` es una sola etiqueta, no tres cajones anidados.
+
+Eso es **Amazon S3** (Simple Storage Service): almacenamiento **de objetos** con capacidad prácticamente ilimitada. Cada abrigo es un objeto, el ticket es su clave y el guardarropa entero es un bucket.
+
+## Tres maneras de guardar cosas
+
+Antes de S3 hay que entender qué lo distingue. Hay tres tipos de almacenamiento y cada uno responde a una necesidad distinta:
+
+| Tipo | En la vida real | Cómo guarda | Al modificar | En AWS |
+| --- | --- | --- | --- | --- |
+| **Bloque** | Las hojas sueltas de un cuaderno | Bloques de tamaño fijo, cada uno con su identificador | Se reescribe solo el bloque afectado | **EBS** |
+| **Archivos** | El archivador de la oficina, con carpetas y subcarpetas | Estructura jerárquica compartida | Se modifica solo la parte afectada | **EFS**, **FSx** |
+| **Objetos** | El guardarropa con tickets | Cada archivo es un objeto: datos, metadatos y una clave | **Se reemplaza el objeto completo** | **S3** |
+
+> **La diferencia que más importa:** en bloques se puede modificar un fragmento; en objetos se reescribe el objeto entero. Eso explica por qué S3 sirve para archivos que se **consultan mucho y se editan poco**, y no sirve como disco de una base de datos.
+
+## Dónde vive cada uno
+
+| Servicio | Alcance | Quién lo usa |
+| --- | --- | --- |
+| **EBS** | Una AZ, una instancia | El disco de una instancia EC2 (lo viste en el [módulo EC2](/servicios/ec2)) |
+| **EFS / FSx** | Regional, muchas instancias | Contenido compartido entre servidores |
+| **S3** | Regional, accesible por HTTP | Contenido estático, respaldos, data lakes |
+
+## Las dos preguntas que guían el módulo
+
+El punto de partida de un arquitecto no es la tecnología, es la necesidad del negocio. Con S3 hay dos preguntas que ordenan todo:
+
+- **Costo y rendimiento.** ¿Con qué frecuencia se accede a estos datos y qué tan rápido deben llegar? De ahí salen la clase de almacenamiento y las reglas de ciclo de vida.
+- **Seguridad.** ¿Cómo protejo la capa contra accesos no deseados y contra la pérdida accidental de datos? De ahí salen los permisos, el cifrado y el versionado.
+
+## Lo que viene
+
+Con esta base — objetos, claves, bucket y los dos ejes de decisión — el resto del módulo es mecánica: qué guarda exactamente un objeto, cómo se mueven datos hacia S3, cómo se elige la clase y cómo se protege el bucket.

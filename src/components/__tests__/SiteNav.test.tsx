@@ -18,6 +18,7 @@ const serviceNames = {
   iam: 'Protección del acceso (AWS IAM)',
   vpc: 'Amazon VPC (Virtual Private Cloud)',
   ec2: 'Amazon EC2 (Elastic Compute Cloud)',
+  s3: 'Capa de almacenamiento (Amazon S3)',
   elasticidad: 'Elasticidad (Auto Scaling, Target Groups y CloudWatch)',
   cloudfront: 'Entrega de contenido (CloudFront, HTTPS y S3)',
 }
@@ -35,14 +36,15 @@ const servicios = Object.keys(serviceNames).map((id, index) => ({
 }))
 
 describe('SiteNav', () => {
-  it('lists all seven modules in logical order, ending with IAM, Elasticidad and Entrega de contenido as M5, M6, M7', () => {
+  it('lists all eight modules in logical order, with IAM, S3, Elasticidad and Entrega de contenido as M5, M6, M7, M8', () => {
     const group = COURSE_MODULES.find(({ modules }) => modules.some(({ id }) => id === 'iam'))!
     const ids = group.modules.map(({ id }) => id)
-    expect(ids).toEqual(['bienvenida', 'well-architected', 'vpc', 'ec2', 'iam', 'elasticidad', 'cloudfront'])
+    expect(ids).toEqual(['bienvenida', 'well-architected', 'vpc', 'ec2', 'iam', 's3', 'elasticidad', 'cloudfront'])
     const iamIndex = ids.indexOf('iam')
     expect(group.modules[iamIndex].label).toMatch(/^M5 /)
     expect(group.modules[iamIndex + 1].label).toMatch(/^M6 /)
     expect(group.modules[iamIndex + 2].label).toMatch(/^M7 /)
+    expect(group.modules[iamIndex + 3].label).toMatch(/^M8 /)
   })
 
   it('renders the requested learning categories, labels, and routes', () => {

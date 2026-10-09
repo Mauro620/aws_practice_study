@@ -2,7 +2,7 @@
   "id": "elasticidad",
   "nombre": "Elasticidad (Auto Scaling, Target Groups y CloudWatch)",
   "categoria": "Cómputo",
-  "modulo": 6,
+  "modulo": 7,
   "prerequisitos": ["vpc", "ec2"],
   "resumenUnaLinea": "Ajustar la capacidad a la demanda real, automáticamente: CloudWatch mide, el Auto Scaling Group decide cuántas instancias hay y el balanceador con su Target Group reparte el tráfico solo entre las sanas.",
   "erroresFrecuentes": [

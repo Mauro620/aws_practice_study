@@ -55,8 +55,8 @@ export type Nodo = {
 const M_VPC = { href: '/servicios/vpc', etiqueta: 'M3 Amazon VPC' }
 const M_EC2 = { href: '/servicios/ec2', etiqueta: 'M4 Amazon EC2' }
 const M_IAM = { href: '/servicios/iam', etiqueta: 'M5 Protección del acceso (AWS IAM)' }
-const M_ELASTICIDAD = { href: '/servicios/elasticidad', etiqueta: 'M6 Elasticidad' }
-const M_CLOUDFRONT = { href: '/servicios/cloudfront', etiqueta: 'M7 Entrega de contenido (CloudFront, HTTPS y S3)' }
+const M_ELASTICIDAD = { href: '/servicios/elasticidad', etiqueta: 'M7 Elasticidad' }
+const M_CLOUDFRONT = { href: '/servicios/cloudfront', etiqueta: 'M8 Entrega de contenido (CloudFront, HTTPS y S3)' }
 
 export const COMPONENTES: Componente[] = [
   {
@@ -153,7 +153,7 @@ export const COMPONENTES: Componente[] = [
     porQue: 'Ofrece un DNS estable mientras las instancias cambian detrás, termina TLS y solo envía tráfico a los destinos que pasan el health check del Target Group.',
     siLoQuitas: 'Las EC2 necesitarían IP pública y cada instancia nueva cambiaría la dirección de entrada. Una instancia caída seguiría recibiendo usuarios, y el ASG no tendría a quién registrar sus instancias.',
     cobro: { modos: ['fijo-por-hora', 'por-uso'], detalle: 'Un cargo por cada hora que el balanceador existe, más un cargo por capacidad consumida (unidades de capacidad del balanceador).' },
-    modulo: { href: '/guia-arquitectura#alb-target-groups', etiqueta: 'Guía de arquitectura · 05 ALB y Target Groups', nota: 'También aparece en M6 Elasticidad, junto al Auto Scaling Group.' },
+    modulo: { href: '/guia-arquitectura#alb-target-groups', etiqueta: 'Guía de arquitectura · 05 ALB y Target Groups', nota: 'También aparece en M7 Elasticidad, junto al Auto Scaling Group.' },
   },
   {
     id: 'target-group', nombre: 'Target Group',
@@ -161,7 +161,7 @@ export const COMPONENTES: Componente[] = [
     porQue: 'El ASG registra y retira instancias aquí automáticamente, y el health check saca del balanceo a las que fallan, para no enviar usuarios a una instancia que no responde.',
     siLoQuitas: 'El listener del ALB no tiene a dónde reenviar las peticiones. Sin health check, una instancia con Apache caído seguiría recibiendo su parte del tráfico.',
     cobro: { modos: ['sin-costo'], detalle: 'El Target Group no tiene cargo propio: forma parte del balanceador.' },
-    modulo: { href: '/guia-arquitectura#alb-target-groups', etiqueta: 'Guía de arquitectura · 05 ALB y Target Groups', nota: 'También aparece en M6 Elasticidad, junto al Auto Scaling Group.' },
+    modulo: { href: '/guia-arquitectura#alb-target-groups', etiqueta: 'Guía de arquitectura · 05 ALB y Target Groups', nota: 'También aparece en M7 Elasticidad, junto al Auto Scaling Group.' },
   },
   {
     id: 'nat-gateway', nombre: 'NAT Gateway',
